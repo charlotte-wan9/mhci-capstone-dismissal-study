@@ -1,0 +1,2932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dismissal Study Prototype</title>
+<script>if(window.frameElement||location.search.includes('preview=1'))document.documentElement.dataset.preview='1';</script>
+<style>
+[data-preview="1"] #landing,
+[data-preview="1"] #preview-lightbox { display: none !important; }
+</style>
+<style>
+@font-face { font-family: '96 Sans'; src: url('96 Sans/96Sans-Light.woff2') format('woff2'); font-weight: 300; font-style: normal; }
+@font-face { font-family: '96 Sans'; src: url('96 Sans/96Sans.woff2') format('woff2'); font-weight: 400; font-style: normal; }
+@font-face { font-family: '96 Sans'; src: url('96 Sans/96Sans-Medium.woff2') format('woff2'); font-weight: 500; font-style: normal; }
+@font-face { font-family: '96 Sans'; src: url('96 Sans/96Sans-Bold.woff2') format('woff2'); font-weight: 700; font-style: normal; }
+@font-face { font-family: '96 Sans'; src: url('96 Sans/96Sans-BoldCondensed.woff2') format('woff2'); font-weight: 700; font-style: condensed; }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue: #003087;
+  --cyan: #4EBEE5;
+  --cyan-light: #EAF7FA;
+  --ph-bg: #EBF4F8;
+  --red: #D6294E;
+  --red-light: #ffcfde;
+  --gray: #9CA3AF;
+  --border: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --text: #111827;
+  --text-mid: #374151;
+  --text-soft: #6B7280;
+  --sidebar-w: 320px;
+  --center-w: 760px;
+  --topbar-h: 56px;
+  --sec-header-h: 48px;
+  --handle-h: 20px;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: '96 Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  display: flex;
+  flex-direction: column;
+  background: #F5F8FA;
+  color: var(--text);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TOP BAR
+══════════════════════════════════════════════════════════════════ */
+.topbar {
+  height: var(--topbar-h);
+  background: white;
+  border-bottom: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  flex-shrink: 0;
+  z-index: 50;
+}
+.logo {
+  font-size: 19px;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--blue);
+  font-family: '96 Sans', Arial Black, Arial, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: -0.2px;
+  line-height: 1;
+}
+.logo-line {
+  height: 2px;
+  background: linear-gradient(90deg, var(--cyan) 0%, transparent 80%);
+  margin-top: 2px;
+  border-radius: 1px;
+}
+.version-switcher {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: #F1F5F9;
+  border-radius: 10px;
+  padding: 4px;
+}
+.v-btn {
+  padding: 5px 18px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: all 0.18s var(--ease);
+}
+.v-btn.active {
+  background: white;
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+.v-btn:not(.active):hover { color: var(--text-mid); background: rgba(255,255,255,0.5); }
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN LAYOUT — sidebars + center all absolutely positioned so
+   the center never shifts when sidebars collapse
+══════════════════════════════════════════════════════════════════ */
+.view { display: none; flex: 1; min-height: 0; position: relative; overflow: hidden; }
+.view.active { display: block; }
+
+/* ═══════════════════════════════════════════════════════════════
+   SIDEBAR
+══════════════════════════════════════════════════════════════════ */
+.sidebar {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: var(--sidebar-w);
+  display: flex;
+  flex-direction: column;
+  background: white;
+  transition: width 0.32s var(--ease);
+  overflow: visible; /* arrow lives outside sidebar boundary — clipping handled by sidebar-inner */
+  z-index: 5;
+}
+.sidebar.left  { left: 0;  border-right: 1.5px solid var(--border); }
+.sidebar.right { right: 0; border-left:  1.5px solid var(--border); }
+.sidebar.closed { width: 20px; }
+.sidebar-inner {
+  width: var(--sidebar-w);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Delay content appearance when opening so it fades in after sidebar has expanded */
+  transition: opacity 0.15s 0.22s var(--ease);
+}
+/* When closing: fast fade, no delay */
+.sidebar.closed .sidebar-inner {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s var(--ease);
+}
+
+.sb-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px; height: 48px;
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  z-index: 20;
+  color: var(--text-soft);
+  font-size: 11px;
+  user-select: none;
+  transition: background 0.15s, color 0.15s;
+}
+.sb-arrow:hover { background: #F8FAFC; color: var(--text); }
+.sidebar.left  .sb-arrow { right: -9px; left: auto; }
+.sidebar.right .sb-arrow { left: -9px; right: auto; }
+.sidebar.left.closed  .sb-arrow { right: auto; left: 1px; border-left: none; border-radius: 0 4px 4px 0; }
+.sidebar.right.closed .sb-arrow { left: auto; right: 1px; border-right: none; border-radius: 4px 0 0 4px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   SECTIONS
+══════════════════════════════════════════════════════════════════ */
+.sections-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sec {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: height 0.3s var(--ease);
+  flex-shrink: 0;
+}
+
+.sec-hd {
+  height: var(--sec-header-h);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 9px;
+  flex-shrink: 0;
+  background: white;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.12s;
+}
+.sec-hd:hover { background: #FAFBFC; }
+
+.sec-icon {
+  width: 20px; height: 20px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.sec-icon img { width: 20px; height: 20px; }
+
+.sec-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+}
+
+.sec-toggle {
+  width: 22px; height: 22px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-soft);
+}
+.sec-toggle svg { display: block; }
+.sec-open-icon  { display: flex; align-items: center; justify-content: center; }
+.sec-close-icon { display: none;  align-items: center; justify-content: center; }
+.sec.collapsed .sec-open-icon  { display: none; }
+.sec.collapsed .sec-close-icon { display: flex; }
+
+.sec-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.sec-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 14px 14px;
+  scroll-behavior: smooth;
+}
+.sec-scroll::-webkit-scrollbar { width: 4px; }
+.sec-scroll::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   RESIZE HANDLE
+══════════════════════════════════════════════════════════════════ */
+.rh {
+  height: var(--handle-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ns-resize;
+  position: relative;
+  user-select: none;
+  touch-action: none;
+  z-index: 2;
+  transition: opacity 0.2s;
+}
+.rh::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  height: 1px;
+  background: var(--border);
+  transition: opacity 0.2s;
+}
+.rh.inactive {
+  cursor: default;
+  pointer-events: none;
+}
+.rh.inactive::before { opacity: 0; }
+.rh.inactive .rh-knob { opacity: 0; }
+
+.rh-knob {
+  position: relative; z-index: 1;
+  width: 36px; height: 20px;
+  background: white;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.2s;
+}
+.rh:hover .rh-knob, .rh.dragging .rh-knob {
+  border-color: var(--border-strong);
+  box-shadow: 0 1px 5px rgba(0,0,0,0.1);
+}
+.rh-knob svg { color: #94A3B8; }
+.rh:hover .rh-knob svg, .rh.dragging .rh-knob svg { color: #64748B; }
+
+/* ═══════════════════════════════════════════════════════════════
+   TRANSCRIPT — dynamic header
+══════════════════════════════════════════════════════════════════ */
+#ts-header {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: white;
+}
+
+/* The single row that holds either title (expanded) or status (collapsed) */
+.ts-hd {
+  height: var(--sec-header-h);
+  display: flex;
+  align-items: center;
+  padding: 0 12px 0 14px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Controls row shown below the title row when expanded */
+.ts-ctrl-row {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px 0 14px;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.listening { background: var(--red); }
+.status-dot.paused    { background: var(--gray); }
+
+.status-label {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-soft);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Wave bars */
+.wave {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  height: 20px;
+}
+.wb { width: 2px; border-radius: 2px; background: var(--red-light); height: 4px; }
+.wb.paused-bar { background: var(--gray); opacity: 0.4; }
+
+@keyframes w1 { 0%,100%{height:3px}  50%{height:14px} }
+@keyframes w2 { 0%,100%{height:8px}  50%{height:3px}  }
+@keyframes w3 { 0%,100%{height:13px} 50%{height:4px}  }
+@keyframes w4 { 0%,100%{height:5px}  50%{height:17px} }
+@keyframes w5 { 0%,100%{height:10px} 50%{height:3px}  }
+@keyframes w6 { 0%,100%{height:3px}  50%{height:12px} }
+@keyframes w7 { 0%,100%{height:16px} 50%{height:5px}  }
+@keyframes w8 { 0%,100%{height:7px}  50%{height:15px} }
+@keyframes w9 { 0%,100%{height:4px}  50%{height:11px} }
+@keyframes w10{ 0%,100%{height:9px}  50%{height:3px}  }
+@keyframes w11{ 0%,100%{height:20px} 50%{height:6px}  }
+@keyframes w12{ 0%,100%{height:6px}  50%{height:18px} }
+@keyframes w13{ 0%,100%{height:3px}  50%{height:8px}  }
+
+.wb.active:nth-child(1)  { animation: w1  0.80s infinite ease-in-out; }
+.wb.active:nth-child(2)  { animation: w2  0.95s infinite ease-in-out 0.10s; }
+.wb.active:nth-child(3)  { animation: w3  0.70s infinite ease-in-out 0.20s; }
+.wb.active:nth-child(4)  { animation: w4  1.10s infinite ease-in-out 0.05s; }
+.wb.active:nth-child(5)  { animation: w5  0.85s infinite ease-in-out 0.15s; }
+.wb.active:nth-child(6)  { animation: w6  0.90s infinite ease-in-out 0.30s; }
+.wb.active:nth-child(7)  { animation: w7  0.75s infinite ease-in-out 0.12s; }
+.wb.active:nth-child(8)  { animation: w8  1.00s infinite ease-in-out 0.25s; }
+.wb.active:nth-child(9)  { animation: w9  0.88s infinite ease-in-out 0.08s; }
+.wb.active:nth-child(10) { animation: w10 0.92s infinite ease-in-out 0.18s; }
+.wb.active:nth-child(11) { animation: w11 1.05s infinite ease-in-out 0.35s; }
+.wb.active:nth-child(12) { animation: w12 0.78s infinite ease-in-out 0.22s; }
+.wb.active:nth-child(13) { animation: w13 0.82s infinite ease-in-out 0.42s; }
+
+/* Icon-only buttons (transport + expand/collapse) */
+.ts-icon-btn {
+  width: 24px; height: 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  transition: opacity 0.15s, background 0.15s;
+  color: var(--text-mid);
+}
+.ts-icon-btn:hover { opacity: 0.75; }
+.ts-icon-btn.stop-icon { background: var(--red); color: white; border-radius: 6px; }
+.ts-icon-btn.stop-icon:hover { opacity: 0.85; }
+.ts-icon-btn.expand-icon { color: var(--text-soft); }
+
+/* Restart button (expanded stopped state) */
+#ts-restart {
+  flex-shrink: 0;
+  padding: 10px 14px 6px;
+  display: none;
+}
+.restart-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 18px;
+  background: #F1F5F9;
+  border: none;
+  border-radius: 20px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.restart-pill:hover { background: #E2E8F0; }
+
+/* Grayed transcript when stopped */
+#ts-scroll.stopped { opacity: 0.38; pointer-events: none; }
+
+/* Transcript entries */
+.ts-entry {
+  margin-bottom: 14px;
+  animation: slideUp 0.3s var(--ease);
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.speaker-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 11px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 5px;
+  letter-spacing: 0.3px;
+}
+.speaker-pill.caller     { background: var(--cyan); color: white; }
+.speaker-pill.specialist { background: #B8E4F0; color: #1A5F7A; }
+.ts-text {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--text-mid);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PLACEHOLDER CONTENT
+══════════════════════════════════════════════════════════════════ */
+.ph-bar  { height: 12px; border-radius: 6px; background: var(--ph-bg); display: block; margin-bottom: 6px; }
+.ph-blk  { background: var(--ph-bg); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+.ph-pill { height: 22px; border-radius: 11px; background: var(--cyan); display: inline-block; margin-bottom: 8px; }
+.policy-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.policy-lbl { width: 70px; flex-shrink: 0; height: 20px; border-radius: 10px; background: var(--cyan); }
+.policy-val { flex: 1; }
+.policy-blk { background: var(--ph-bg); border-radius: 8px; height: 36px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   CENTER — anchored to left sidebar width, never shifts
+══════════════════════════════════════════════════════════════════ */
+.center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0; bottom: 0;
+  width: var(--center-w);
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #F5F8FA;
+}
+.center::-webkit-scrollbar { width: 6px; }
+.center::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+
+.c-card { background: var(--cyan-light); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.c-blk { background: white; border-radius: 10px; }
+.c-blk.h1 { height: 120px; }
+.c-blk.h2 { height: 180px; }
+.c-blk.h3 { height: 90px; }
+.c-header-pill { height: 28px; border-radius: 14px; background: var(--cyan); }
+.c-btn-pill    { height: 28px; border-radius: 14px; background: var(--cyan); }
+
+/* ═══════════════════════════════════════════════════════════════
+   NOTES / SUPPORT
+══════════════════════════════════════════════════════════════════ */
+.notes-fill {
+  flex: 1;
+  margin: 12px 14px 14px;
+  background: var(--ph-bg);
+  border-radius: 8px;
+  min-height: 0;
+}
+.support-msgs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.s-msg .s-from { height: 22px; border-radius: 11px; background: var(--cyan); display: inline-block; margin-bottom: 5px; }
+.s-msg .s-bar  { height: 12px; border-radius: 6px; background: var(--ph-bg); margin-bottom: 4px; }
+.s-msg.right   { text-align: right; }
+.s-msg.right .s-from { background: #B8E4F0; }
+.s-msg.right .s-bar  { background: #EBF4F8; display: inline-block; }
+
+.support-input-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.support-input {
+  flex: 1;
+  padding: 7px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  color: var(--text);
+  transition: border-color 0.2s;
+}
+.support-input:focus { border-color: var(--cyan); }
+.send-btn {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: #111827;
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.send-btn:hover { background: #1F2937; transform: scale(1.05); }
+
+/* ═══════════════════════════════════════════════════════════════
+   VERSION 3 — Fixed left sidebar (notes/summary/policy always)
+   Live transcript side-panel (collapsible, overlaps center)
+   Support as floating FAB → popup panel
+══════════════════════════════════════════════════════════════════ */
+#view-3 .v3-layout {
+  position: absolute; inset: 0;
+  background: #F5F8FA;
+  overflow: hidden;
+}
+
+/* Transcript panel — always at x=0, revealed behind sidebar */
+.v3-ts-panel {
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 360px;
+  background: white;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-16px);
+  transition: opacity 0.22s var(--ease), transform 0.22s var(--ease);
+}
+.v3-ts-open .v3-ts-panel {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateX(0);
+  transition: opacity 0.25s 0.12s var(--ease), transform 0.25s 0.12s var(--ease);
+}
+
+/* Transcript title bar */
+.v3-ts-titlebar {
+  height: 64px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 16px;
+  flex-shrink: 0;
+  border-bottom: 1.5px solid var(--border);
+  background: white;
+}
+.v3-ts-titlebar span { font-size: 17px; font-weight: 700; color: var(--text); }
+
+/* Transcript entries scroll */
+.v3-ts-entries {
+  flex: 1; overflow-y: auto;
+  padding: 14px 16px;
+  min-height: 0;
+}
+.v3-ts-entries::-webkit-scrollbar { width: 4px; }
+.v3-ts-entries::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+.v3-ts-entries.stopped { opacity: 0.38; pointer-events: none; }
+
+/* Sidebar panel — shifts right when transcript expands */
+.v3-sidebar {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 360px;
+  left: 0;
+  background: white;
+  border-right: 1.5px solid var(--border);
+  display: flex; flex-direction: column;
+  z-index: 10;
+  transition: left 0.32s var(--ease), box-shadow 0.32s var(--ease);
+}
+.v3-ts-open .v3-sidebar {
+  left: 360px;
+  box-shadow: 3px 0 6px rgba(0,44,92,0.04),
+              10px 0 10px rgba(0,44,92,0.04),
+              23px 0 14px rgba(0,44,92,0.02),
+              41px 0 16px rgba(0,44,92,0.01),
+              63px 0 18px rgba(0,44,92,0);
+}
+
+/* Transcript control bar at top of sidebar */
+.v3-ctrl-bar {
+  height: 64px;
+  display: flex; align-items: stretch;
+  flex-shrink: 0;
+  border-bottom: 1.5px solid var(--border);
+  background: white;
+  overflow: hidden;
+}
+
+/* Left portion: mic/status/wave/transport */
+.v3-ctrl-main {
+  flex: 1;
+  display: flex; align-items: center;
+  padding: 0 10px 0 14px;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Chevron — full-height separated cell */
+.v3-chev-btn {
+  width: 56px;
+  flex-shrink: 0;
+  border: none;
+  border-left: 1.5px solid var(--border);
+  border-radius: 0;
+  background: white;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-soft);
+  transition: background 0.12s, color 0.12s;
+}
+.v3-chev-btn:hover { background: #F8FAFC; color: var(--text); }
+
+/* Center column — fixed, never moves */
+.v3-center {
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+  top: 0; bottom: 0;
+  width: var(--center-w);
+  overflow-y: auto;
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+  background: #F5F8FA;
+  z-index: 1;
+}
+.v3-center::-webkit-scrollbar { width: 6px; }
+.v3-center::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+
+/* Support FAB */
+.v3-fab {
+  position: absolute;
+  right: 24px; bottom: 24px;
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: #2862a4;
+  border: 2px solid #0077b3;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 60;
+  box-shadow: 0 3px 6px rgba(0,44,92,0.12), 0 10px 10px rgba(0,44,92,0.08);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.v3-fab:hover { transform: scale(1.07); box-shadow: 0 6px 14px rgba(0,44,92,0.22); }
+.v3-fab img { width: 22px; height: 22px; display: block; }
+
+/* Support floating panel */
+.v3-support-panel {
+  position: absolute;
+  right: 24px; bottom: 88px;
+  width: var(--sidebar-w);
+  max-height: 500px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0,44,92,0.14), 0 1px 6px rgba(0,0,0,0.08);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  z-index: 55;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(14px) scale(0.96);
+  transform-origin: bottom right;
+  transition: opacity 0.22s var(--ease), transform 0.22s var(--ease);
+}
+.v3-support-panel.open {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0) scale(1);
+}
+.v3-support-hdr {
+  height: 56px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 12px 0 16px;
+  flex-shrink: 0;
+  border-bottom: 1.5px solid var(--border);
+}
+.v3-support-hdr span { font-size: 16px; font-weight: 700; color: var(--text); flex: 1; }
+.v3-support-close {
+  width: 28px; height: 28px;
+  border: none; border-radius: 6px; background: transparent;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-soft);
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.v3-support-close:hover { background: #F1F5F9; color: var(--text); }
+
+/* ═══════════════════════════════════════════════════════════════
+   VOICE QUALITY ALERT — shared + per-version styles
+══════════════════════════════════════════════════════════════════ */
+
+/* Topbar trigger button */
+.alert-trigger-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  background: white;
+  color: var(--text);
+  font-size: 12px; font-weight: 600; font-family: inherit;
+  cursor: pointer; white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.alert-trigger-btn:hover { background: #F5F8FA; border-color: #c7d3de; }
+
+/* Shared "Got it" / X dismiss buttons */
+.alert-gotit {
+  padding: 7px 16px;
+  background: #111827; color: white;
+  border: none; border-radius: 7px;
+  font-size: 13px; font-weight: 600; font-family: inherit;
+  cursor: pointer; flex-shrink: 0;
+  transition: background 0.15s;
+}
+.alert-gotit:hover { background: #1F2937; }
+.alert-x {
+  width: 26px; height: 26px; flex-shrink: 0;
+  border: none; background: transparent; border-radius: 6px;
+  cursor: pointer; color: var(--text-soft); font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s;
+}
+.alert-x:hover { background: rgba(0,0,0,0.07); }
+
+/* V1 — top-center banner, slides down from topbar */
+.v1-banner {
+  position: fixed;
+  top: var(--topbar-h); left: 50%;
+  transform: translateX(-50%) translateY(-100%);
+  width: 600px;
+  z-index: 200;
+  pointer-events: none; opacity: 0;
+  transition: transform 0.36s var(--ease), opacity 0.28s var(--ease);
+}
+.v1-banner.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1; pointer-events: all;
+}
+.v1-banner-card {
+  background: #fceff2;
+  border: 1.5px solid #f8b4c8; border-top: none;
+  border-radius: 0 0 14px 14px;
+  padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: 0 8px 32px rgba(0,44,92,0.12), 0 2px 8px rgba(214,41,78,0.07);
+}
+.v1-banner-icon {
+  width: 30px; height: 30px; flex-shrink: 0;
+  background: #D6294E; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 14px; font-weight: 700;
+}
+.v1-banner-texts { flex: 1; min-width: 0; }
+.v1-banner-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+.v1-banner-desc  { font-size: 12px; color: var(--text-mid); line-height: 1.45; }
+
+/* V2 — bottom-right toast */
+.v2-toast {
+  position: absolute;
+  bottom: 20px; right: 20px;
+  width: 300px; z-index: 200;
+  opacity: 0; pointer-events: none;
+  transform: translateY(12px) scale(0.97);
+  transform-origin: bottom right;
+  transition: opacity 0.28s var(--ease), transform 0.28s var(--ease);
+}
+.v2-toast.show {
+  opacity: 1; pointer-events: all;
+  transform: translateY(0) scale(1);
+}
+.v2-toast-inner {
+  background: #fceff2;
+  border: 1.5px solid #f8b4c8; border-radius: 14px;
+  padding: 14px 14px 13px;
+  box-shadow: 0 8px 32px rgba(0,44,92,0.14), 0 2px 8px rgba(214,41,78,0.08);
+}
+.v2-toast-top {
+  display: flex; align-items: flex-start; gap: 8px; margin-bottom: 7px;
+}
+.v2-toast-icon {
+  width: 22px; height: 22px; flex-shrink: 0; margin-top: 1px;
+  background: #D6294E; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 11px; font-weight: 700;
+}
+.v2-toast-title { font-size: 14px; font-weight: 700; color: var(--text); flex: 1; line-height: 1.3; }
+.v2-toast-body  { font-size: 12px; color: var(--text-mid); line-height: 1.45; margin-bottom: 12px; }
+.v2-toast-foot  { display: flex; justify-content: flex-end; }
+
+/* V3 — anchored modal next to Call Summary section */
+.v3-alert-overlay {
+  position: absolute;
+  left: 360px; right: 0; top: 0; bottom: 0;
+  z-index: 90;
+  background: rgba(0,0,0,0);
+  pointer-events: none;
+  transition: background 0.25s var(--ease);
+}
+.v3-alert-overlay.show {
+  background: rgba(0,0,0,0.15);
+  pointer-events: all;
+}
+.v3-modal {
+  position: absolute;
+  left: 16px;
+  top: 40%;
+  width: 400px;
+  transform: translateY(-50%) translateY(14px) scale(0.97);
+  background: #fceff2;
+  border-radius: 16px;
+  padding: 24px 24px 20px;
+  box-shadow: 0 13px 28px rgba(0,44,92,0.08), 0 50px 50px rgba(0,44,92,0.06), 0 113px 68px rgba(0,44,92,0.04);
+  border-left: 4px solid #D6294E;
+  opacity: 0;
+  transition: opacity 0.28s 0.05s var(--ease), transform 0.28s 0.05s var(--ease);
+  pointer-events: none;
+}
+.v3-alert-overlay.show .v3-modal {
+  opacity: 1;
+  transform: translateY(-50%) translateY(0) scale(1);
+  pointer-events: all;
+}
+.v3-modal-title { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+.v3-modal-body  { font-size: 14px; color: var(--text-mid); line-height: 1.55; margin-bottom: 22px; }
+.v3-modal-foot  { display: flex; justify-content: flex-end; }
+.v3-modal-gotit {
+  padding: 11px 28px;
+  background: #111827; color: white;
+  border: none; border-radius: 8px;
+  font-size: 14px; font-weight: 700; font-family: inherit;
+  cursor: pointer; transition: background 0.15s;
+}
+.v3-modal-gotit:hover { background: #1F2937; }
+
+/* V4 — in-place error state inside the transcript status bar */
+.v4-ts-bar.v4-err {
+  background: #fceff2;
+  border-bottom-color: #f8b4c8;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VERSION 4 — Toolbar-activated floating panel cards
+══════════════════════════════════════════════════════════════════ */
+#view-4 .v4-layout {
+  position: absolute; inset: 0;
+  background: #F5F8FA;
+  overflow: hidden;
+}
+
+.v4-col {
+  position: absolute;
+  top: 8px; bottom: 8px;
+  width: var(--sidebar-w);
+  display: flex; flex-direction: column;
+  pointer-events: none;
+  z-index: 3;
+}
+.v4-col-left  { left: 4px; padding: 4px 4px 4px 4px; }
+.v4-col-right { right: 4px; bottom: 80px; padding: 4px 4px 4px 4px; }
+
+.v4-slot {
+  flex: 0 1 0;
+  min-height: 0;
+  display: flex; flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transition: flex-grow 0.38s cubic-bezier(0.4,0,0.2,1),
+              opacity    0.25s cubic-bezier(0.4,0,0.2,1),
+              margin-bottom 0.38s cubic-bezier(0.4,0,0.2,1);
+  margin-bottom: 0;
+}
+.v4-slot.open {
+  flex-grow: 1;
+  opacity: 1;
+  pointer-events: all;
+  margin-bottom: 8px;
+}
+.v4-slot.open.last { margin-bottom: 0; }
+
+.v4-card {
+  flex: 1;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 6px rgba(0,44,92,0.06), 0 8px 24px rgba(0,44,92,0.08);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.v4-hdr {
+  height: 52px;
+  display: flex; align-items: center;
+  padding: 0 10px 0 14px;
+  gap: 9px;
+  flex-shrink: 0;
+  border-bottom: 1.5px solid var(--border);
+}
+.v4-hdr-title {
+  font-size: 15px; font-weight: 700;
+  color: var(--text); flex: 1;
+}
+.v4-close-btn {
+  width: 26px; height: 26px;
+  border: none; border-radius: 6px; background: transparent;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-soft); flex-shrink: 0;
+  transition: background 0.12s, color 0.12s;
+}
+.v4-close-btn:hover { background: #F1F5F9; color: var(--text); }
+
+.v4-ts-bar {
+  display: flex; align-items: center;
+  padding: 0 10px 0 14px;
+  gap: 7px; height: 42px;
+  flex-shrink: 0;
+  border-bottom: 1.5px solid var(--border);
+}
+
+.v4-body {
+  flex: 1; overflow-y: auto;
+  padding: 12px 14px;
+  min-height: 0;
+}
+.v4-body::-webkit-scrollbar { width: 4px; }
+.v4-body::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+#v4-ts-body.stopped { opacity: 0.38; pointer-events: none; }
+
+.v4-notes-body {
+  flex: 1; padding: 12px 14px 14px;
+  display: flex; flex-direction: column; min-height: 0;
+}
+.v4-notes-body .notes-fill { flex: 1; min-height: 0; }
+
+.v4-support-msgs {
+  flex: 1; overflow-y: auto;
+  padding: 10px 14px; min-height: 0;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.v4-support-msgs::-webkit-scrollbar { width: 4px; }
+.v4-support-msgs::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+
+.v4-center {
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+  top: 0; bottom: 0; width: var(--center-w);
+  overflow-y: auto; padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+  background: #F5F8FA; z-index: 1;
+}
+.v4-center::-webkit-scrollbar { width: 6px; }
+.v4-center::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+
+.v4-toolbar {
+  position: absolute; bottom: 16px; right: 12px;
+  display: flex; align-items: center; gap: 2px;
+  background: white; border-radius: 40px; padding: 6px;
+  box-shadow: 0 2px 8px rgba(0,44,92,0.10), 0 8px 24px rgba(0,44,92,0.08);
+  z-index: 50;
+}
+.v4-tb-btn {
+  width: 44px; height: 44px;
+  border: none; border-radius: 50%;
+  background: transparent; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.18s; flex-shrink: 0;
+}
+.v4-tb-btn:hover:not(.v4-active) { background: #F1F5F9; }
+.v4-tb-btn.v4-active { background: #2862a4; }
+.v4-tb-btn.v4-active:hover { background: #1d4f8a; }
+.v4-tb-btn img { width: 22px; height: 22px; display: block; }
+
+/* ═══════════════════════════════════════════════════════════════
+   VERSION PLACEHOLDERS
+══════════════════════════════════════════════════════════════════ */
+.coming-soon {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 10px; color: var(--text-soft);
+}
+.cs-tag {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px;
+  color: var(--cyan); background: var(--cyan-light);
+  padding: 4px 12px; border-radius: 12px;
+}
+.coming-soon h2 { font-size: 22px; color: var(--text); font-weight: 700; }
+.coming-soon p  { font-size: 14px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   TOPBAR — right cluster
+══════════════════════════════════════════════════════════════════ */
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VERSION 2 — Panel toggles + tabbed left panel
+══════════════════════════════════════════════════════════════════ */
+
+/* Panel toggle buttons in topbar */
+.v2-panel-btns {
+  display: none;
+  align-items: center;
+  gap: 2px;
+}
+.v2-panel-btns.show { display: flex; }
+.v2-pnl-btn {
+  width: 32px; height: 32px;
+  border: none; border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #64748B;
+  transition: background 0.15s, color 0.15s;
+}
+.v2-pnl-btn:hover { background: #F1F5F9; color: var(--text); }
+.v2-pnl-btn.v2-active { background: var(--cyan-light); color: var(--cyan); }
+
+/* Main layout — absolutely fills #view-2 (which is position:relative) */
+#view-2 .v2-layout {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #F5F8FA;
+}
+
+/* ── LEFT PANEL ── */
+.v2-left {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 360px;
+  z-index: 5;
+  overflow: hidden;
+  transition: width 0.32s var(--ease);
+}
+.v2-left.closed { width: 0; }
+.v2-left-inner {
+  width: 360px; height: 100%;
+  display: flex; flex-direction: column;
+  background: white;
+  overflow: hidden;
+  border-right: 1.5px solid var(--border);
+  transition: opacity 0.15s 0.22s var(--ease);
+}
+.v2-left.closed .v2-left-inner {
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.12s var(--ease);
+}
+
+/* Tab strip */
+.v2-tabs {
+  display: flex;
+  height: 64px;
+  flex-shrink: 0;
+}
+.v2-tab {
+  width: 120px; height: 64px;
+  border: none;
+  border-right: 1.5px solid var(--border);
+  border-bottom: 1.5px solid var(--border);
+  background: white;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.v2-tab:last-child { border-right: none; }
+.v2-tab.active { border-bottom-color: transparent; }
+.v2-tab:not(.active):hover { background: #FAFBFC; }
+
+/* Tab panes */
+.v2-pane {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; min-height: 0;
+}
+.v2-pane.v2-pane-hidden { display: none; }
+
+/* Transcript pane */
+.v2-ts-hdr {
+  padding: 20px 20px 14px;
+  flex-shrink: 0;
+}
+.v2-pane-title {
+  font-size: 20px; font-weight: 700; color: var(--text);
+  margin-bottom: 12px;
+}
+.v2-ts-ctrl {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 40px;
+}
+.v2-ctrl-btn {
+  width: 40px; height: 40px;
+  border: none; border-radius: 10px;
+  background: #F1F5F9;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-mid);
+  transition: background 0.15s, opacity 0.15s;
+}
+.v2-ctrl-btn:hover { opacity: 0.75; }
+.v2-ctrl-btn.v2-stop-btn { background: var(--red-light); }
+
+#v2-ts-restart {
+  flex-shrink: 0;
+  padding: 4px 20px 8px;
+  display: none;
+}
+#v2-ts-scroll {
+  flex: 1; overflow-y: auto;
+  padding: 4px 20px 20px;
+}
+#v2-ts-scroll::-webkit-scrollbar { width: 4px; }
+#v2-ts-scroll::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+#v2-ts-scroll.stopped { opacity: 0.38; pointer-events: none; }
+
+/* Generic pane content scroll */
+.v2-pane-scroll {
+  flex: 1; overflow-y: auto;
+  padding: 0 20px 20px;
+}
+.v2-pane-scroll::-webkit-scrollbar { width: 4px; }
+.v2-pane-scroll::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+
+/* ── CENTER COLUMN — always centered in viewport, never shifts ── */
+.v2-center-col {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0; bottom: 0;
+  width: var(--center-w);
+  overflow: hidden;
+}
+.v2-main {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.v2-main::-webkit-scrollbar { width: 6px; }
+.v2-main::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+
+/* ── BOTTOM PANEL (Notes) ── */
+.v2-bottom {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 300px;
+  overflow: hidden;
+  transition: height 0.32s var(--ease), left 0.32s var(--ease), right 0.32s var(--ease);
+  z-index: 4;
+}
+.v2-bottom.closed { height: 0; }
+.v2-bottom-inner {
+  height: 300px;
+  display: flex; flex-direction: column;
+  background: white;
+  border-top: 1.5px solid var(--border);
+}
+.v2-notes-body {
+  flex: 1; padding: 12px 20px 16px;
+  display: flex; flex-direction: column; min-height: 0;
+}
+.v2-notes-body .notes-fill { flex: 1; }
+
+/* ── RIGHT PANEL (Support) ── */
+.v2-right {
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 360px;
+  z-index: 5;
+  overflow: hidden;
+  transition: width 0.32s var(--ease);
+}
+.v2-right.closed { width: 0; }
+.v2-right-inner {
+  width: 360px; height: 100%;
+  display: flex; flex-direction: column;
+  background: white; overflow: hidden;
+  border-left: 1.5px solid var(--border);
+  transition: opacity 0.15s 0.22s var(--ease);
+}
+.v2-right.closed .v2-right-inner {
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.12s var(--ease);
+}
+
+/* Panel header */
+.v2-panel-hdr {
+  height: 64px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 16px 0 20px;
+  flex-shrink: 0;
+  border-bottom: 1.5px solid var(--border);
+}
+.v2-panel-hdr-icon { width: 24px; height: 24px; flex-shrink: 0; }
+.v2-panel-hdr-title {
+  font-size: 17px; font-weight: 700; color: var(--text); flex: 1;
+}
+.v2-close-btn {
+  width: 28px; height: 28px;
+  border: none; border-radius: 6px; background: transparent;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-soft);
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.v2-close-btn:hover { background: #F1F5F9; color: var(--text); }
+
+/* ═══════════════════════════════════════════════════════════════
+   LANDING PAGE
+══════════════════════════════════════════════════════════════════ */
+#landing {
+  position: fixed; inset: 0; z-index: 1000;
+  background: #F5F8FA;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 0;
+  transition: opacity 0.4s var(--ease), transform 0.4s var(--ease);
+}
+#landing.hide {
+  opacity: 0; pointer-events: none;
+  transform: translateY(-16px);
+}
+.landing-eyebrow {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-soft);
+  margin-bottom: 18px;
+}
+.landing-title {
+  font-size: 42px; font-weight: 700; color: var(--text);
+  line-height: 1.1; text-align: center; margin-bottom: 14px;
+}
+.landing-title span { color: var(--blue); }
+.landing-subtitle {
+  font-size: 15px; color: var(--text-mid); line-height: 1.6;
+  text-align: center; max-width: 480px; margin-bottom: 44px;
+}
+.landing-actions { display: flex; gap: 12px; align-items: center; }
+.landing-enter-btn {
+  padding: 13px 32px;
+  background: var(--blue); color: white;
+  border: none; border-radius: 10px;
+  font-size: 15px; font-weight: 700; font-family: inherit;
+  cursor: pointer; transition: background 0.15s, transform 0.12s;
+}
+.landing-enter-btn:hover { background: #1e52a0; transform: translateY(-1px); }
+.landing-preview-btn {
+  padding: 13px 24px;
+  background: white; color: var(--text);
+  border: 1.5px solid var(--border); border-radius: 10px;
+  font-size: 15px; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: background 0.15s, border-color 0.15s;
+  display: flex; align-items: center; gap: 7px;
+}
+.landing-preview-btn:hover { background: #EEF3F8; border-color: #c0ccd6; }
+
+/* Preview lightbox */
+#preview-lightbox {
+  position: fixed; inset: 0; z-index: 1100;
+  background: rgba(0,0,0,0);
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+  transition: background 0.25s var(--ease);
+}
+#preview-lightbox.show {
+  background: rgba(0,0,0,0.55);
+  pointer-events: all;
+}
+.preview-lb-inner {
+  width: min(96vw, 1400px);
+  background: white; border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.28);
+  opacity: 0; transform: scale(0.94) translateY(16px);
+  transition: opacity 0.28s 0.05s var(--ease), transform 0.28s 0.05s var(--ease);
+  display: flex; flex-direction: column;
+}
+#preview-lightbox.show .preview-lb-inner {
+  opacity: 1; transform: scale(1) translateY(0);
+}
+.preview-lb-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px 13px;
+  border-bottom: 1.5px solid var(--border);
+  flex-shrink: 0;
+}
+.preview-lb-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.preview-lb-close {
+  width: 30px; height: 30px; border: none; background: transparent;
+  border-radius: 7px; cursor: pointer; color: var(--text-soft);
+  font-size: 20px; display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s;
+}
+.preview-lb-close:hover { background: #F1F5F9; color: var(--text); }
+.preview-lb-frame {
+  width: 1280px; height: 720px;
+  border: none;
+  transform-origin: top left;
+  transform: scale(calc(min(90vw, 960px) / 1280));
+  pointer-events: none;
+}
+.preview-lb-body {
+  max-height: min(85vh, 1000px);
+  overflow: hidden;
+  background: #F5F8FA;
+}
+</style>
+</head>
+<body>
+
+<!-- LANDING PAGE -->
+<div id="landing">
+  <p class="landing-eyebrow">UX Research — Capstone Study</p>
+  <h1 class="landing-title">Dismissal <span>Study</span></h1>
+  <p class="landing-subtitle">A comparative study of notification dismissal patterns across four interface designs for Progressive Insurance agent tools.</p>
+  <div class="landing-actions">
+    <button class="landing-enter-btn" onclick="enterPrototype()">Enter Prototype</button>
+    <button class="landing-preview-btn" onclick="openPreview()">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="1" y="2.5" width="12" height="9" rx="1.5"/><path d="M5 6l2.5 2L10 6"/></svg>
+      Preview Interface
+    </button>
+  </div>
+</div>
+
+<!-- PREVIEW LIGHTBOX -->
+<div id="preview-lightbox" onclick="handleLbClick(event)">
+  <div class="preview-lb-inner">
+    <div class="preview-lb-header">
+      <span class="preview-lb-title">Interface Preview — Version 1</span>
+      <button class="preview-lb-close" onclick="closePreview()">×</button>
+    </div>
+    <div class="preview-lb-body">
+      <img src="Preview.png" style="width:100%;height:auto;display:block;">
+    </div>
+  </div>
+</div>
+
+<div class="topbar">
+  <div>
+    <div class="logo">PROGRESSIVE</div>
+    <div class="logo-line"></div>
+  </div>
+  <div class="topbar-right">
+    <button class="alert-trigger-btn" onclick="triggerVoiceAlert()" title="Simulate: Low Voice Quality Detection">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="#D6294E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6.5 1.5L12 11.5H1L6.5 1.5Z"/>
+        <path d="M6.5 5.5v2.5M6.5 9.5v.5"/>
+      </svg>
+      Low Voice Quality
+    </button>
+    <div class="v2-panel-btns" id="v2-panel-btns">
+      <button class="v2-pnl-btn" id="vpb-left" onclick="v2TogglePanel('left')" title="Toggle Left Panel">
+        <svg width="18" height="16" viewBox="0 0 18 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0.75" y="0.75" width="16.5" height="14.5" rx="1.75" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="5.5" y1="0.75" x2="5.5" y2="15.25" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+      </button>
+      <button class="v2-pnl-btn" id="vpb-bottom" onclick="v2TogglePanel('bottom')" title="Toggle Bottom Panel">
+        <svg width="18" height="16" viewBox="0 0 18 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0.75" y="0.75" width="16.5" height="14.5" rx="1.75" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="0.75" y1="11" x2="17.25" y2="11" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+      </button>
+      <button class="v2-pnl-btn" id="vpb-right" onclick="v2TogglePanel('right')" title="Toggle Right Panel">
+        <svg width="18" height="16" viewBox="0 0 18 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0.75" y="0.75" width="16.5" height="14.5" rx="1.75" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="12.5" y1="0.75" x2="12.5" y2="15.25" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+      </button>
+    </div>
+    <div class="version-switcher">
+      <button class="v-btn active" onclick="switchVersion(1)">Version 1</button>
+      <button class="v-btn"        onclick="switchVersion(2)">Version 2</button>
+      <button class="v-btn"        onclick="switchVersion(3)">Version 3</button>
+      <button class="v-btn"        onclick="switchVersion(4)">Version 4</button>
+    </div>
+  </div>
+</div>
+
+<!-- VERSION 1 -->
+<div class="view active" id="view-1">
+
+  <!-- LEFT SIDEBAR -->
+  <div class="sidebar left" id="left-sb">
+    <div class="sidebar-inner">
+      <div class="sections-wrap" id="left-wrap">
+
+        <!-- LIVE TRANSCRIPT -->
+        <div class="sec" id="sec-ts" style="height:calc(33.33% - 13px)">
+          <div id="ts-header"><!-- JS renders --></div>
+          <div class="sec-body" id="ts-body">
+            <div id="ts-restart">
+              <button class="restart-pill" onclick="startTS()">
+                Start Transcription
+                <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor" style="opacity:0.6"><path d="M1 1l8 5-8 5V1z"/></svg>
+              </button>
+            </div>
+            <div class="sec-scroll" id="ts-scroll"></div>
+          </div>
+        </div>
+
+        <div class="rh" id="rh-a" data-above="sec-ts" data-below="sec-summary">
+          <div class="rh-knob">
+            <svg width="14" height="10" viewBox="0 0 14 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M2 3.5l5-3 5 3M2 6.5l5 3 5-3"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- CALL SUMMARY -->
+        <div class="sec" id="sec-summary" style="height:calc(33.33% - 13px)">
+          <div class="sec-hd" onclick="toggleSec('summary')">
+            <div class="sec-icon"><img src="icons/Abstract to 2.svg" alt=""></div>
+            <span class="sec-title">Call Summary</span>
+            <div class="sec-toggle">
+              <span class="sec-open-icon"><svg width="11" height="2" viewBox="0 0 11 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1h9"/></svg></span>
+              <span class="sec-close-icon"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5.5 1v9M1 5.5h9"/></svg></span>
+            </div>
+          </div>
+          <div class="sec-body">
+            <div class="sec-scroll">
+              <div class="ph-blk"><div class="ph-bar" style="width:85%"></div><div class="ph-bar" style="width:70%"></div><div class="ph-bar" style="width:88%"></div></div>
+              <div class="ph-blk"><div class="ph-bar" style="width:75%"></div><div class="ph-bar" style="width:62%"></div><div class="ph-bar" style="width:80%"></div></div>
+              <div class="ph-blk" style="padding:12px"><div class="ph-pill" style="width:115px"></div><div class="ph-bar" style="width:68%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rh" id="rh-b" data-above="sec-summary" data-below="sec-policy">
+          <div class="rh-knob">
+            <svg width="14" height="10" viewBox="0 0 14 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M2 3.5l5-3 5 3M2 6.5l5 3 5-3"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- POLICY INFO -->
+        <div class="sec" id="sec-policy" style="height:calc(33.33% - 13px)">
+          <div class="sec-hd" onclick="toggleSec('policy')">
+            <div class="sec-icon"><img src="icons/folder.svg" alt=""></div>
+            <span class="sec-title">Policy Info</span>
+            <div class="sec-toggle">
+              <span class="sec-open-icon"><svg width="11" height="2" viewBox="0 0 11 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1h9"/></svg></span>
+              <span class="sec-close-icon"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5.5 1v9M1 5.5h9"/></svg></span>
+            </div>
+          </div>
+          <div class="sec-body">
+            <div class="sec-scroll">
+              <div class="policy-row"><div class="policy-lbl"></div><div class="policy-val"><div class="ph-bar" style="width:62%"></div></div></div>
+              <div class="policy-row"><div class="policy-lbl"></div><div class="policy-val"><div class="policy-blk"></div></div></div>
+              <div class="policy-row"><div class="policy-lbl"></div><div class="policy-val"><div class="ph-bar" style="width:55%"></div></div></div>
+              <div class="policy-row"><div class="policy-lbl" style="background:#87D8E8"></div><div class="policy-val"><div class="ph-bar" style="width:74%"></div></div></div>
+              <div class="policy-row"><div class="policy-lbl" style="background:#87D8E8"></div><div class="policy-val"><div class="ph-bar" style="width:48%"></div></div></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="sb-arrow" id="la" onclick="toggleSidebar('left')">&#x2039;</div>
+  </div>
+
+  <!-- CENTER -->
+  <div class="center">
+    <div class="c-card">
+      <div class="c-header-pill" style="width:220px"></div>
+      <div class="c-blk h1"></div>
+      <div class="c-blk h2"></div>
+    </div>
+    <div class="c-card">
+      <div class="c-btn-pill" style="width:180px"></div>
+      <div class="c-blk h2"></div>
+      <div class="c-blk h3"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT SIDEBAR -->
+  <div class="sidebar right" id="right-sb">
+    <div class="sb-arrow" id="ra" onclick="toggleSidebar('right')">&#x203A;</div>
+    <div class="sidebar-inner">
+      <div class="sections-wrap">
+
+        <!-- NOTES -->
+        <div class="sec" id="sec-notes" style="height:calc(60% - 10px)">
+          <div class="sec-hd" onclick="toggleSec('notes')">
+            <div class="sec-icon"><img src="icons/pen.svg" alt=""></div>
+            <span class="sec-title">Notes</span>
+            <div class="sec-toggle">
+              <span class="sec-open-icon"><svg width="11" height="2" viewBox="0 0 11 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1h9"/></svg></span>
+              <span class="sec-close-icon"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5.5 1v9M1 5.5h9"/></svg></span>
+            </div>
+          </div>
+          <div class="sec-body" style="display:flex;flex-direction:column">
+            <div class="notes-fill"></div>
+          </div>
+        </div>
+
+        <div class="rh" id="rh-r" data-above="sec-notes" data-below="sec-support">
+          <div class="rh-knob">
+            <svg width="14" height="10" viewBox="0 0 14 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M2 3.5l5-3 5 3M2 6.5l5 3 5-3"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- SUPPORT -->
+        <div class="sec" id="sec-support" style="height:calc(40% - 10px)">
+          <div class="sec-hd" onclick="toggleSec('support')">
+            <div class="sec-icon"><img src="icons/review.svg" alt=""></div>
+            <span class="sec-title">Support</span>
+            <div class="sec-toggle">
+              <span class="sec-open-icon"><svg width="11" height="2" viewBox="0 0 11 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1h9"/></svg></span>
+              <span class="sec-close-icon"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5.5 1v9M1 5.5h9"/></svg></span>
+            </div>
+          </div>
+          <div class="sec-body">
+            <div class="support-msgs">
+              <div class="s-msg">
+                <div class="s-from" style="width:110px"></div>
+                <div class="s-bar" style="width:88%"></div>
+                <div class="s-bar" style="width:72%"></div>
+              </div>
+              <div class="s-msg right">
+                <div class="s-from" style="width:130px"></div><br>
+                <div class="s-bar" style="width:170px"></div>
+                <div class="s-bar" style="width:150px"></div>
+              </div>
+              <div class="s-msg">
+                <div class="s-from" style="width:95px"></div>
+                <div class="s-bar" style="width:80%"></div>
+                <div class="s-bar" style="width:64%"></div>
+              </div>
+            </div>
+            <div class="support-input-row">
+              <input class="support-input" type="text" placeholder="Type a message…">
+              <button class="send-btn">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round">
+                  <path d="M6.5 1v11M6.5 1L2 5.5M6.5 1l4.5 4.5"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+</div><!-- /view-1 -->
+
+<div class="view" id="view-2">
+  <div class="v2-layout">
+
+    <!-- LEFT PANEL -->
+    <div class="v2-left" id="v2-left">
+      <div class="v2-left-inner">
+
+        <!-- Tab strip -->
+        <div class="v2-tabs">
+          <button class="v2-tab active" id="v2-tab-ts" onclick="v2SwitchTab('ts')" title="Live Transcript">
+            <img src="icons/Voice to 1.svg" width="28" height="28" alt="">
+          </button>
+          <button class="v2-tab" id="v2-tab-summary" onclick="v2SwitchTab('summary')" title="Call Summary">
+            <img src="icons/Abstract to 2.svg" width="28" height="28" alt="">
+          </button>
+          <button class="v2-tab" id="v2-tab-policy" onclick="v2SwitchTab('policy')" title="Policy Info">
+            <img src="icons/folder.svg" width="28" height="28" alt="">
+          </button>
+        </div>
+
+        <!-- Pane: Live Transcript -->
+        <div class="v2-pane" id="v2-pane-ts">
+          <div class="v2-ts-hdr">
+            <div class="v2-pane-title">Live Transcript</div>
+            <div id="v2-ts-controls"></div>
+          </div>
+          <div id="v2-ts-restart">
+            <button class="restart-pill" onclick="v2StartTS()">
+              Start Transcription
+              <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor" style="opacity:0.6"><path d="M1 1l8 5-8 5V1z"/></svg>
+            </button>
+          </div>
+          <div id="v2-ts-scroll"></div>
+        </div>
+
+        <!-- Pane: Call Summary -->
+        <div class="v2-pane v2-pane-hidden" id="v2-pane-summary">
+          <div class="v2-pane-title" style="padding: 24px 20px 12px;">Call Summary</div>
+          <div class="v2-pane-scroll">
+            <div class="ph-blk"><div class="ph-bar" style="width:85%"></div><div class="ph-bar" style="width:70%"></div><div class="ph-bar" style="width:88%"></div></div>
+            <div class="ph-blk"><div class="ph-bar" style="width:75%"></div><div class="ph-bar" style="width:62%"></div><div class="ph-bar" style="width:80%"></div></div>
+            <div class="ph-blk" style="padding:12px"><div class="ph-pill" style="width:115px"></div><div class="ph-bar" style="width:68%"></div></div>
+          </div>
+        </div>
+
+        <!-- Pane: Policy Info -->
+        <div class="v2-pane v2-pane-hidden" id="v2-pane-policy">
+          <div class="v2-pane-title" style="padding: 24px 20px 12px;">Policy Info</div>
+          <div class="v2-pane-scroll">
+            <div class="policy-row"><div class="policy-lbl"></div><div class="policy-val"><div class="ph-bar" style="width:62%"></div></div></div>
+            <div class="policy-row"><div class="policy-lbl"></div><div class="policy-val"><div class="policy-blk"></div></div></div>
+            <div class="policy-row"><div class="policy-lbl"></div><div class="policy-val"><div class="ph-bar" style="width:55%"></div></div></div>
+            <div class="policy-row"><div class="policy-lbl" style="background:#87D8E8"></div><div class="policy-val"><div class="ph-bar" style="width:74%"></div></div></div>
+            <div class="policy-row"><div class="policy-lbl" style="background:#87D8E8"></div><div class="policy-val"><div class="ph-bar" style="width:48%"></div></div></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- CENTER COLUMN -->
+    <div class="v2-center-col">
+      <div class="v2-main">
+        <div class="c-card">
+          <div class="c-header-pill" style="width:220px"></div>
+          <div class="c-blk h1"></div>
+          <div class="c-blk h2"></div>
+        </div>
+        <div class="c-card">
+          <div class="c-btn-pill" style="width:180px"></div>
+          <div class="c-blk h2"></div>
+          <div class="c-blk h3"></div>
+        </div>
+        <div class="c-card">
+          <div class="c-btn-pill" style="width:160px"></div>
+          <div class="c-blk h3"></div>
+          <div class="c-blk h2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTTOM PANEL: Notes -->
+    <div class="v2-bottom closed" id="v2-bottom">
+      <div class="v2-bottom-inner">
+        <div class="v2-panel-hdr">
+          <img class="v2-panel-hdr-icon" src="icons/pen.svg" alt="">
+          <span class="v2-panel-hdr-title">Notes</span>
+          <button class="v2-close-btn" onclick="v2TogglePanel('bottom')" title="Close Notes">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1l11 11M12 1L1 12"/></svg>
+          </button>
+        </div>
+        <div class="v2-notes-body">
+          <div class="notes-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: Support -->
+    <div class="v2-right closed" id="v2-right">
+      <div class="v2-right-inner">
+        <div class="v2-panel-hdr">
+          <img class="v2-panel-hdr-icon" src="icons/review.svg" alt="">
+          <span class="v2-panel-hdr-title">Support</span>
+          <button class="v2-close-btn" onclick="v2TogglePanel('right')" title="Close Support">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1l11 11M12 1L1 12"/></svg>
+          </button>
+        </div>
+        <div class="support-msgs">
+          <div class="s-msg">
+            <div class="s-from" style="width:110px"></div>
+            <div class="s-bar" style="width:88%"></div>
+            <div class="s-bar" style="width:72%"></div>
+          </div>
+          <div class="s-msg right">
+            <div class="s-from" style="width:130px"></div><br>
+            <div class="s-bar" style="display:inline-block;width:170px"></div>
+            <div class="s-bar" style="display:inline-block;width:150px"></div>
+          </div>
+          <div class="s-msg">
+            <div class="s-from" style="width:95px"></div>
+            <div class="s-bar" style="width:80%"></div>
+            <div class="s-bar" style="width:64%"></div>
+          </div>
+        </div>
+        <div class="support-input-row">
+          <input class="support-input" type="text" placeholder="Type a message…">
+          <button class="send-btn">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round"><path d="M6.5 1v11M6.5 1L2 5.5M6.5 1l4.5 4.5"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <!-- V2: bottom-right toast -->
+  <div class="v2-toast" id="v2-toast">
+    <div class="v2-toast-inner">
+      <div class="v2-toast-top">
+        <div class="v2-toast-icon">!</div>
+        <div class="v2-toast-title">Low Voice Quality Detected</div>
+        <button class="alert-x" onclick="dismissV2Alert()" title="Dismiss">×</button>
+      </div>
+      <div class="v2-toast-body">Voice transcription stopped. Please validate or manually note down caller name and intent.</div>
+      <div class="v2-toast-foot">
+        <button class="alert-gotit" onclick="dismissV2Alert()">Got it</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /view-2 -->
+<div class="view" id="view-3">
+  <div class="v3-layout" id="v3-layout">
+
+    <!-- Transcript panel (x=0, revealed when expanded) -->
+    <div class="v3-ts-panel" id="v3-ts-panel">
+      <div class="v3-ts-titlebar">
+        <div class="sec-icon"><img src="icons/Voice to 1.svg" alt=""></div>
+        <span>Live Transcript</span>
+      </div>
+      <div id="v3-ts-restart" style="display:none;padding:10px 14px 6px">
+        <button class="restart-pill" onclick="v3StartTS()">
+          Start Transcription
+          <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor" style="opacity:0.6"><path d="M1 1l8 5-8 5V1z"/></svg>
+        </button>
+      </div>
+      <div class="v3-ts-entries" id="v3-ts-entries"></div>
+    </div>
+
+    <!-- Sidebar: ctrl bar + Notes / Call Summary / Policy Info -->
+    <div class="v3-sidebar" id="v3-sidebar">
+
+      <div class="v3-ctrl-bar" id="v3-ctrl-bar"><!-- rendered by JS --></div>
+
+      <div class="sections-wrap" id="v3-wrap">
+
+        <!-- Notes -->
+        <div class="sec" id="v3-sec-notes" style="height:calc(33.33% - 13px)">
+          <div class="sec-hd" onclick="v3ToggleSec('notes')">
+            <div class="sec-icon"><img src="icons/pen.svg" alt=""></div>
+            <span class="sec-title">Notes</span>
+            <div class="sec-toggle">
+              <span class="sec-open-icon"><svg width="11" height="2" viewBox="0 0 11 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1h9"/></svg></span>
+              <span class="sec-close-icon"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5.5 1v9M1 5.5h9"/></svg></span>
+            </div>
+          </div>
+          <div class="sec-body" style="display:flex;flex-direction:column">
+            <div class="notes-fill"></div>
+          </div>
+        </div>
+
+        <div class="rh" id="v3-rh-a" data-above="v3-sec-notes" data-below="v3-sec-summary">
+          <div class="rh-knob">
+            <svg width="14" height="10" viewBox="0 0 14 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 3.5l5-3 5 3M2 6.5l5 3 5-3"/></svg>
+          </div>
+        </div>
+
+        <!-- Call Summary -->
+        <div class="sec" id="v3-sec-summary" style="height:calc(33.33% - 13px)">
+          <div class="sec-hd" onclick="v3ToggleSec('summary')">
+            <div class="sec-icon"><img src="icons/Abstract to 2.svg" alt=""></div>
+            <span class="sec-title">Call Summary</span>
+            <div class="sec-toggle">
+              <span class="sec-open-icon"><svg width="11" height="2" viewBox="0 0 11 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1h9"/></svg></span>
+              <span class="sec-close-icon"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5.5 1v9M1 5.5h9"/></svg></span>
+            </div>
+          </div>
+          <div class="sec-body">
+            <div class="sec-scroll">
+              <div class="ph-blk"><div class="ph-bar" style="width:85%"></div><div class="ph-bar" style="width:70%"></div><div class="ph-bar" style="width:88%"></div></div>
+              <div class="ph-blk"><div class="ph-bar" style="width:75%"></div><div class="ph-bar" style="width:62%"></div><div class="ph-bar" style="width:80%"></div></div>
+              <div class="ph-blk" style="padding:12px"><div class="ph-pill" style="width:115px"></div><div class="ph-bar" style="width:68%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rh" id="v3-rh-b" data-above="v3-sec-summary" data-below="v3-sec-policy">
+          <div class="rh-knob">
+            <svg width="14" height="10" viewBox="0 0 14 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 3.5l5-3 5 3M2 6.5l5 3 5-3"/></svg>
+          </div>
+        </div>
+
+        <!-- Policy Info -->
+        <div class="sec" id="v3-sec-policy" style="height:calc(33.33% - 13px)">
+          <div class="sec-hd" onclick="v3ToggleSec('policy')">
+            <div class="sec-icon"><img src="icons/folder.svg" alt=""></div>
+            <span class="sec-title">Policy Info</span>
+            <div class="sec-toggle">
+              <span class="sec-open-icon"><svg width="11" height="2" viewBox="0 0 11 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1h9"/></svg></span>
+              <span class="sec-close-icon"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5.5 1v9M1 5.5h9"/></svg></span>
+            </div>
+          </div>
+          <div class="sec-body">
+            <div class="sec-scroll">
+              <div class="policy-row"><div class="policy-lbl"></div><div class="policy-val"><div class="ph-bar" style="width:62%"></div></div></div>
+              <div class="policy-row"><div class="policy-lbl"></div><div class="policy-val"><div class="policy-blk"></div></div></div>
+              <div class="policy-row"><div class="policy-lbl"></div><div class="policy-val"><div class="ph-bar" style="width:55%"></div></div></div>
+              <div class="policy-row"><div class="policy-lbl" style="background:#87D8E8"></div><div class="policy-val"><div class="ph-bar" style="width:74%"></div></div></div>
+              <div class="policy-row"><div class="policy-lbl" style="background:#87D8E8"></div><div class="policy-val"><div class="ph-bar" style="width:48%"></div></div></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /v3-sidebar -->
+
+    <!-- Center column — fixed, never moves -->
+    <div class="v3-center">
+      <div class="c-card">
+        <div class="c-header-pill" style="width:220px"></div>
+        <div class="c-blk h1"></div>
+        <div class="c-blk h2"></div>
+      </div>
+      <div class="c-card">
+        <div class="c-btn-pill" style="width:180px"></div>
+        <div class="c-blk h2"></div>
+        <div class="c-blk h3"></div>
+      </div>
+      <div class="c-card">
+        <div class="c-btn-pill" style="width:160px"></div>
+        <div class="c-blk h3"></div>
+        <div class="c-blk h2"></div>
+      </div>
+    </div>
+
+    <!-- Support floating panel -->
+    <div class="v3-support-panel" id="v3-support-panel">
+      <div class="v3-support-hdr">
+        <img src="icons/review.svg" width="20" height="20" alt="">
+        <span>Support</span>
+        <button class="v3-support-close" onclick="v3ToggleSupport()" title="Close">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1l11 11M12 1L1 12"/></svg>
+        </button>
+      </div>
+      <div class="support-msgs" style="max-height:280px">
+        <div class="s-msg">
+          <div class="s-from" style="width:110px"></div>
+          <div class="s-bar" style="width:88%"></div>
+          <div class="s-bar" style="width:72%"></div>
+        </div>
+        <div class="s-msg right">
+          <div class="s-from" style="width:130px"></div><br>
+          <div class="s-bar" style="display:inline-block;width:130px"></div>
+          <div class="s-bar" style="display:inline-block;width:110px"></div>
+        </div>
+        <div class="s-msg">
+          <div class="s-from" style="width:95px"></div>
+          <div class="s-bar" style="width:80%"></div>
+          <div class="s-bar" style="width:64%"></div>
+        </div>
+      </div>
+      <div class="support-input-row">
+        <input class="support-input" type="text" placeholder="Type a message…">
+        <button class="send-btn">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round"><path d="M6.5 1v11M6.5 1L2 5.5M6.5 1l4.5 4.5"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Support FAB -->
+    <button class="v3-fab" id="v3-fab" onclick="v3ToggleSupport()">
+      <img src="icons/review Light.svg" alt="Support">
+    </button>
+
+  </div>
+    <!-- V3: center modal overlay -->
+    <div class="v3-alert-overlay" id="v3-alert-overlay">
+      <div class="v3-modal">
+        <div class="v3-modal-title">Low Voice Quality Detected</div>
+        <div class="v3-modal-body">Voice transcription stopped. Please validate or manually note down caller name and intent under Call Summary.</div>
+        <div class="v3-modal-foot">
+          <button class="v3-modal-gotit" onclick="dismissV3Alert()">Got it</button>
+        </div>
+      </div>
+    </div>
+
+</div><!-- /view-3 -->
+<div class="view" id="view-4">
+  <div class="v4-layout">
+
+    <!-- Left column: Transcript · Summary · Policy -->
+    <div class="v4-col v4-col-left" id="v4-col-left">
+
+      <div class="v4-slot" id="v4s-ts">
+        <div class="v4-card">
+          <div class="v4-hdr">
+            <div class="sec-icon"><img src="icons/Voice to 1.svg" alt=""></div>
+            <span class="v4-hdr-title">Live Transcript</span>
+            <button class="v4-close-btn" onclick="v4Toggle('ts')" title="Close">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1l11 11M12 1L1 12"/></svg>
+            </button>
+          </div>
+          <div class="v4-ts-bar" id="v4-ts-bar"><!-- JS renders --></div>
+          <div class="v4-body" id="v4-ts-body"></div>
+        </div>
+      </div>
+
+      <div class="v4-slot" id="v4s-summary">
+        <div class="v4-card">
+          <div class="v4-hdr">
+            <div class="sec-icon"><img src="icons/Abstract to 2.svg" alt=""></div>
+            <span class="v4-hdr-title">Call Summary</span>
+            <button class="v4-close-btn" onclick="v4Toggle('summary')" title="Close">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1l11 11M12 1L1 12"/></svg>
+            </button>
+          </div>
+          <div class="v4-body">
+            <div class="ph-blk"><div class="ph-bar" style="width:85%"></div><div class="ph-bar" style="width:70%"></div><div class="ph-bar" style="width:88%"></div></div>
+            <div class="ph-blk"><div class="ph-bar" style="width:75%"></div><div class="ph-bar" style="width:62%"></div><div class="ph-bar" style="width:80%"></div></div>
+            <div class="ph-blk" style="padding:12px"><div class="ph-pill" style="width:115px"></div><div class="ph-bar" style="width:68%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="v4-slot" id="v4s-policy">
+        <div class="v4-card">
+          <div class="v4-hdr">
+            <div class="sec-icon"><img src="icons/folder.svg" alt=""></div>
+            <span class="v4-hdr-title">Policy Info</span>
+            <button class="v4-close-btn" onclick="v4Toggle('policy')" title="Close">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1l11 11M12 1L1 12"/></svg>
+            </button>
+          </div>
+          <div class="v4-body">
+            <div class="policy-row"><div class="policy-lbl"></div><div class="policy-val"><div class="ph-bar" style="width:62%"></div></div></div>
+            <div class="policy-row"><div class="policy-lbl"></div><div class="policy-val"><div class="policy-blk"></div></div></div>
+            <div class="policy-row"><div class="policy-lbl"></div><div class="policy-val"><div class="ph-bar" style="width:55%"></div></div></div>
+            <div class="policy-row"><div class="policy-lbl" style="background:#87D8E8"></div><div class="policy-val"><div class="ph-bar" style="width:74%"></div></div></div>
+            <div class="policy-row"><div class="policy-lbl" style="background:#87D8E8"></div><div class="policy-val"><div class="ph-bar" style="width:48%"></div></div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right column: Notes · Support -->
+    <div class="v4-col v4-col-right" id="v4-col-right">
+
+      <div class="v4-slot" id="v4s-notes">
+        <div class="v4-card">
+          <div class="v4-hdr">
+            <div class="sec-icon"><img src="icons/pen.svg" alt=""></div>
+            <span class="v4-hdr-title">Notes</span>
+            <button class="v4-close-btn" onclick="v4Toggle('notes')" title="Close">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1l11 11M12 1L1 12"/></svg>
+            </button>
+          </div>
+          <div class="v4-notes-body">
+            <div class="notes-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="v4-slot" id="v4s-support">
+        <div class="v4-card">
+          <div class="v4-hdr">
+            <div class="sec-icon"><img src="icons/review.svg" alt=""></div>
+            <span class="v4-hdr-title">Support</span>
+            <button class="v4-close-btn" onclick="v4Toggle('support')" title="Close">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1l11 11M12 1L1 12"/></svg>
+            </button>
+          </div>
+          <div class="v4-support-msgs">
+            <div class="s-msg">
+              <div class="s-from" style="width:110px"></div>
+              <div class="s-bar" style="width:88%"></div>
+              <div class="s-bar" style="width:72%"></div>
+            </div>
+            <div class="s-msg right">
+              <div class="s-from" style="width:130px"></div><br>
+              <div class="s-bar" style="display:inline-block;width:150px"></div>
+              <div class="s-bar" style="display:inline-block;width:130px"></div>
+            </div>
+            <div class="s-msg">
+              <div class="s-from" style="width:95px"></div>
+              <div class="s-bar" style="width:80%"></div>
+              <div class="s-bar" style="width:64%"></div>
+            </div>
+          </div>
+          <div class="support-input-row">
+            <input class="support-input" type="text" placeholder="Type a message…">
+            <button class="send-btn">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round"><path d="M6.5 1v11M6.5 1L2 5.5M6.5 1l4.5 4.5"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Center content — fixed, never moves -->
+    <div class="v4-center">
+      <div class="c-card">
+        <div class="c-header-pill" style="width:220px"></div>
+        <div class="c-blk h1"></div>
+        <div class="c-blk h2"></div>
+      </div>
+      <div class="c-card">
+        <div class="c-btn-pill" style="width:180px"></div>
+        <div class="c-blk h2"></div>
+        <div class="c-blk h3"></div>
+      </div>
+      <div class="c-card">
+        <div class="c-btn-pill" style="width:160px"></div>
+        <div class="c-blk h3"></div>
+        <div class="c-blk h2"></div>
+      </div>
+    </div>
+
+    <!-- Bottom-right toolbar -->
+    <div class="v4-toolbar">
+      <button class="v4-tb-btn" id="v4tb-ts" onclick="v4Toggle('ts')" title="Live Transcript">
+        <img id="v4tbimg-ts" src="icons/Voice to 1.svg" alt="">
+      </button>
+      <button class="v4-tb-btn" id="v4tb-summary" onclick="v4Toggle('summary')" title="Call Summary">
+        <img id="v4tbimg-summary" src="icons/Abstract to 2.svg" alt="">
+      </button>
+      <button class="v4-tb-btn" id="v4tb-policy" onclick="v4Toggle('policy')" title="Policy Info">
+        <img id="v4tbimg-policy" src="icons/folder.svg" alt="">
+      </button>
+      <button class="v4-tb-btn" id="v4tb-notes" onclick="v4Toggle('notes')" title="Notes">
+        <img id="v4tbimg-notes" src="icons/pen.svg" alt="">
+      </button>
+      <button class="v4-tb-btn" id="v4tb-support" onclick="v4Toggle('support')" title="Support">
+        <img id="v4tbimg-support" src="icons/review.svg" alt="">
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  TRANSCRIPT
+// ═══════════════════════════════════════════════════════════════
+const TS = { status: 'idle', lines: [], idx: 0, timer: null, hasStarted: false };
+
+const LINES = [
+  { s:'caller',     t:"Hi, I'm calling about my auto insurance policy. I just got into a minor fender bender and need to file a claim." },
+  { s:'specialist', t:"I'm sorry to hear that — I hope everyone is safe. I can help you file that claim today. Could I get your policy number?" },
+  { s:'caller',     t:"Yes, it's PA-4471-88. The accident happened yesterday around 3 PM on Route 9 near Millbrook." },
+  { s:'specialist', t:"Got it, thank you. I've pulled up your account. You have comprehensive and collision coverage. Was anyone injured?" },
+  { s:'caller',     t:"No, thankfully nobody was hurt. The other car has a small dent and my front bumper has some damage." },
+  { s:'specialist', t:"Glad to hear it. I'll open a claim now — you'll get a confirmation by email and a claims adjuster will call within 24 hours." },
+  { s:'caller',     t:"Great. Do I need to use a specific repair shop, or can I go anywhere?" },
+  { s:'specialist', t:"You can use any licensed shop you prefer, or one of our Progressive Service Centers which offer a lifetime repair guarantee." },
+  { s:'caller',     t:"That's helpful. What's my deductible for this type of claim?" },
+  { s:'specialist', t:"Your collision deductible is $500. Once we receive the repair estimate we'll walk you through the next steps." },
+  { s:'caller',     t:"Perfect, that's all I needed. Thank you so much." },
+  { s:'specialist', t:"You're all set! I've noted everything on your account. Drive safe — we've got you covered!" },
+];
+
+// SVG icons (inline, not using ctrl-btn wrapper)
+const IC_MIC    = `<img src="icons/Voice to 1.svg" style="width:20px;height:20px;display:block">`;
+const IC_PLAY   = `<svg width="9" height="11" viewBox="0 0 9 11" fill="currentColor"><path d="M0 0l9 5.5L0 11V0z"/></svg>`;
+const IC_PAUSE  = `<svg width="9" height="11" viewBox="0 0 9 11" fill="currentColor"><rect x="0" y="0" width="3" height="11" rx="1"/><rect x="6" y="0" width="3" height="11" rx="1"/></svg>`;
+const IC_STOP   = `<svg width="9" height="9" viewBox="0 0 9 9" fill="white"><rect width="9" height="9" rx="1.5"/></svg>`;
+const IC_PLUS   = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5.5 1v9M1 5.5h9"/></svg>`;
+const IC_MINUS  = `<svg width="11" height="2" viewBox="0 0 11 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1h9"/></svg>`;
+
+function waveHTML(cls) {
+  const heights = [10, 15, 13, 22, 19, 10, 5, 20, 12, 7, 27, 10, 9];
+  return `<div class="wave">${heights.map(h =>
+    `<div class="wb ${cls}" style="height:${h}px"></div>`).join('')}</div>`;
+}
+
+function renderTS() {
+  const sec    = document.getElementById('sec-ts');
+  const header = document.getElementById('ts-header');
+  const scroll = document.getElementById('ts-scroll');
+  const restart= document.getElementById('ts-restart');
+  const isExp  = !sec.classList.contains('collapsed');
+  const st     = TS.status;
+  const hasLines = TS.lines.length > 0;
+
+  // ── HEADER ────────────────────────────────────────────────
+  if (isExp) {
+    // Always show title row + separate controls row (or nothing for idle)
+    let ctrlRow = '';
+    if (st === 'listening') {
+      ctrlRow = `<div class="ts-ctrl-row">
+        <div class="status-dot listening"></div>
+        <span class="status-label">Listening...</span>
+        ${waveHTML('active')}
+        <button class="ts-icon-btn" onclick="event.stopPropagation();pauseTS()" title="Pause">${IC_PAUSE}</button>
+        <button class="ts-icon-btn stop-icon" onclick="event.stopPropagation();stopTS()" title="Stop">${IC_STOP}</button>
+      </div>`;
+    } else if (st === 'paused') {
+      ctrlRow = `<div class="ts-ctrl-row">
+        <div class="status-dot paused"></div>
+        <span class="status-label">Paused</span>
+        ${waveHTML('paused-bar')}
+        <button class="ts-icon-btn" onclick="event.stopPropagation();resumeTS()" title="Resume">${IC_PLAY}</button>
+        <button class="ts-icon-btn stop-icon" onclick="event.stopPropagation();stopTS()" title="Stop">${IC_STOP}</button>
+      </div>`;
+    }
+    // Idle: show restart pill in body, no ctrl row
+    header.innerHTML = `
+      <div class="ts-hd">
+        <div class="sec-icon">${IC_MIC}</div>
+        <span class="sec-title">Live Transcript</span>
+        <button class="ts-icon-btn expand-icon" onclick="event.stopPropagation();toggleTSec()" title="Collapse">${IC_MINUS}</button>
+      </div>${ctrlRow}`;
+
+    // Restart pill and scroll graying
+    restart.style.display = (st === 'idle' && TS.hasStarted) ? 'block' : 'none';
+    scroll.classList.toggle('stopped', st === 'idle' && hasLines);
+
+  } else {
+    // Collapsed — single row showing status + expand btn on far right
+    let inner = '';
+    if (st === 'listening') {
+      inner = `
+        <div class="status-dot listening"></div>
+        <span class="status-label">Listening...</span>
+        ${waveHTML('active')}
+        <button class="ts-icon-btn" onclick="event.stopPropagation();pauseTS()" title="Pause">${IC_PAUSE}</button>
+        <button class="ts-icon-btn stop-icon" onclick="event.stopPropagation();stopTS()" title="Stop">${IC_STOP}</button>
+        <button class="ts-icon-btn expand-icon" onclick="event.stopPropagation();toggleTSec()" title="Expand">${IC_PLUS}</button>`;
+    } else if (st === 'paused') {
+      inner = `
+        <div class="sec-icon">${IC_MIC}</div>
+        <span class="status-label" style="flex:1">Paused</span>
+        ${waveHTML('paused-bar')}
+        <button class="ts-icon-btn" onclick="event.stopPropagation();resumeTS()" title="Resume">${IC_PLAY}</button>
+        <button class="ts-icon-btn stop-icon" onclick="event.stopPropagation();stopTS()" title="Stop">${IC_STOP}</button>
+        <button class="ts-icon-btn expand-icon" onclick="event.stopPropagation();toggleTSec()" title="Expand">${IC_PLUS}</button>`;
+    } else {
+      // idle
+      inner = `
+        <div class="sec-icon">${IC_MIC}</div>
+        <span class="sec-title" style="flex:1">Live Transcript</span>
+        <button class="ts-icon-btn" onclick="event.stopPropagation();startTS()" title="Start">${IC_PLAY}</button>
+        <button class="ts-icon-btn expand-icon" onclick="event.stopPropagation();toggleTSec()" title="Expand">${IC_PLUS}</button>`;
+    }
+    header.innerHTML = `<div class="ts-hd">${inner}</div>`;
+    restart.style.display = 'none';
+    scroll.classList.remove('stopped');
+  }
+
+  // ── TRANSCRIPT ENTRIES ─────────────────────────────────────
+  scroll.innerHTML = '';
+  TS.lines.forEach(({ s, t }) => {
+    const el = document.createElement('div');
+    el.className = 'ts-entry';
+    el.innerHTML = `<div class="speaker-pill ${s}">${s === 'caller' ? 'Caller' : 'Specialist'}</div>
+                    <div class="ts-text">${t}</div>`;
+    scroll.appendChild(el);
+  });
+  scroll.scrollTop = scroll.scrollHeight;
+}
+
+function startTS() {
+  TS.status = 'listening'; TS.lines = []; TS.idx = 0; TS.hasStarted = true;
+  const sec = document.getElementById('sec-ts');
+  if (sec.classList.contains('collapsed')) expandSec('ts', false);
+  renderTS();
+  scheduleTS();
+}
+function pauseTS()  { TS.status = 'paused'; clearTimeout(TS.timer); renderTS(); }
+function resumeTS() { TS.status = 'listening'; renderTS(); scheduleTS(); }
+function stopTS()   {
+  TS.status = 'idle';
+  clearTimeout(TS.timer);
+  // Keep TS.lines intact — transcript stays visible, grayed out
+  renderTS();
+}
+function resetTSFull() {
+  TS.status = 'idle'; TS.lines = []; TS.idx = 0; TS.hasStarted = false;
+  clearTimeout(TS.timer);
+}
+
+function scheduleTS() {
+  if (TS.idx >= LINES.length) return;
+  TS.timer = setTimeout(() => {
+    if (TS.status !== 'listening') return;
+    TS.lines.push(LINES[TS.idx++]);
+    renderTS();
+    scheduleTS();
+  }, 1900 + Math.random() * 1200);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SECTION COLLAPSE
+// ═══════════════════════════════════════════════════════════════
+const SEC_HEIGHTS = {};
+const HEADER_H = 48;
+
+function toggleSec(name) {
+  const sec = document.getElementById(`sec-${name}`);
+  if (!sec) return;
+  sec.classList.contains('collapsed') ? expandSec(name, false) : collapseSec(name);
+  updateHandles();
+}
+
+function collapseSec(name) {
+  const id  = `sec-${name}`;
+  const sec = document.getElementById(id);
+  SEC_HEIGHTS[id] = sec.offsetHeight;
+
+  sec.style.transition = 'height 0.28s cubic-bezier(0.4,0,0.2,1)';
+  sec.style.height = HEADER_H + 'px';
+  sec.classList.add('collapsed');
+
+  const sibId = findExpandedSibling(id);
+  if (sibId) {
+    const sib  = document.getElementById(sibId);
+    const freed = (SEC_HEIGHTS[id] || 0) - HEADER_H;
+    sib.style.transition = 'height 0.28s cubic-bezier(0.4,0,0.2,1)';
+    sib.style.height = (sib.offsetHeight + freed) + 'px';
+  }
+}
+
+function expandSec(name, immediate) {
+  const id  = `sec-${name}`;
+  const sec = document.getElementById(id);
+  const savedH = SEC_HEIGHTS[id];
+  const wrap = sec.closest('.sections-wrap');
+
+  let targetH = (savedH && savedH > HEADER_H) ? savedH : calcFairShare(wrap, id);
+
+  const sibId = findExpandedSibling(id);
+  if (sibId) {
+    const sib   = document.getElementById(sibId);
+    const sibH  = sib.offsetHeight;
+    const newSibH = Math.max(HEADER_H + 40, sibH - (targetH - HEADER_H));
+    targetH = HEADER_H + (sibH - newSibH);
+    sib.style.transition = immediate ? 'none' : 'height 0.28s cubic-bezier(0.4,0,0.2,1)';
+    sib.style.height = newSibH + 'px';
+  }
+
+  sec.style.transition = immediate ? 'none' : 'height 0.28s cubic-bezier(0.4,0,0.2,1)';
+  sec.style.height = targetH + 'px';
+  sec.classList.remove('collapsed');
+  delete SEC_HEIGHTS[id];
+}
+
+function calcFairShare(wrap, excludeId) {
+  const handles  = [...wrap.querySelectorAll('.rh')];
+  const secs     = [...wrap.querySelectorAll('.sec')];
+  const totalH   = wrap.offsetHeight - handles.reduce((s, h) => s + h.offsetHeight, 0);
+  const collapsed = secs.filter(s => s.classList.contains('collapsed'));
+  const expanded  = secs.filter(s => !s.classList.contains('collapsed') && s.id !== excludeId);
+  return totalH - collapsed.length * HEADER_H - expanded.reduce((s, el) => s + el.offsetHeight, 0);
+}
+
+function findExpandedSibling(id) {
+  const sec  = document.getElementById(id);
+  const wrap = sec.closest('.sections-wrap');
+  const secs = [...wrap.querySelectorAll('.sec')];
+  const idx  = secs.findIndex(s => s.id === id);
+  for (let i = idx + 1; i < secs.length; i++) {
+    if (!secs[i].classList.contains('collapsed')) return secs[i].id;
+  }
+  for (let i = idx - 1; i >= 0; i--) {
+    if (!secs[i].classList.contains('collapsed')) return secs[i].id;
+  }
+  return null;
+}
+
+function toggleTSec() {
+  const sec = document.getElementById('sec-ts');
+  sec.classList.contains('collapsed') ? expandSec('ts', false) : collapseSec('ts');
+  updateHandles();
+  renderTS();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RESIZE HANDLES — only active when both neighbors are expanded
+// ═══════════════════════════════════════════════════════════════
+function updateHandles() {
+  document.querySelectorAll('.rh').forEach(handle => {
+    const above = document.getElementById(handle.dataset.above);
+    const below = document.getElementById(handle.dataset.below);
+    const both  = above && below &&
+                  !above.classList.contains('collapsed') &&
+                  !below.classList.contains('collapsed');
+    handle.classList.toggle('inactive', !both);
+  });
+}
+
+function initResize() {
+  document.querySelectorAll('.rh').forEach(handle => {
+    let startY, startAbove, startBelow, aboveEl, belowEl;
+    let raf = null, pending = 0;
+    const MIN_H = 80;
+
+    handle.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      if (handle.classList.contains('inactive')) return;
+      aboveEl = document.getElementById(handle.dataset.above);
+      belowEl = document.getElementById(handle.dataset.below);
+      if (!aboveEl || !belowEl) return;
+
+      handle.setPointerCapture(e.pointerId);
+      handle.classList.add('dragging');
+      startY     = e.clientY;
+      startAbove = aboveEl.offsetHeight;
+      startBelow = belowEl.offsetHeight;
+      aboveEl.style.transition = 'none';
+      belowEl.style.transition = 'none';
+    });
+
+    handle.addEventListener('pointermove', e => {
+      if (!handle.hasPointerCapture(e.pointerId)) return;
+      pending = e.clientY - startY;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const total = startAbove + startBelow;
+        const newA  = Math.max(MIN_H, Math.min(total - MIN_H, startAbove + pending));
+        aboveEl.style.height = newA + 'px';
+        belowEl.style.height = (total - newA) + 'px';
+        aboveEl.style.flex = 'none';
+        belowEl.style.flex = 'none';
+      });
+    });
+
+    handle.addEventListener('pointerup', e => {
+      if (!handle.hasPointerCapture(e.pointerId)) return;
+      handle.releasePointerCapture(e.pointerId);
+      handle.classList.remove('dragging');
+      cancelAnimationFrame(raf);
+      if (aboveEl) { aboveEl.style.transition = ''; belowEl.style.transition = ''; }
+      aboveEl = belowEl = null;
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SIDEBAR
+// ═══════════════════════════════════════════════════════════════
+function toggleSidebar(side) {
+  const sb    = document.getElementById(`${side}-sb`);
+  const arrow = document.getElementById(side === 'left' ? 'la' : 'ra');
+  const isOpen = !sb.classList.contains('closed');
+  sb.classList.toggle('closed', isOpen);
+  if (side === 'left')  arrow.innerHTML = isOpen ? '&#x203A;' : '&#x2039;';
+  else                  arrow.innerHTML = isOpen ? '&#x2039;' : '&#x203A;';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  VERSION SWITCHER
+// ═══════════════════════════════════════════════════════════════
+let currentV = 1;
+
+function switchVersion(v) {
+  if (v === currentV) return;
+  if (currentV === 1) resetV1();
+  if (currentV === 2) resetV2();
+  if (currentV === 3) resetV3();
+  if (currentV === 4) resetV4();
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.v-btn').forEach((b, i) => b.classList.toggle('active', i === v - 1));
+  document.getElementById(`view-${v}`).classList.add('active');
+  if (v === 1) initV1();
+  if (v === 2) initV2();
+  if (v === 3) initV3();
+  if (v === 4) initV4();
+  currentV = v;
+}
+
+function resetV1() {
+  resetTSFull();
+  ['summary','policy','notes','support','ts'].forEach(name => {
+    const sec = document.getElementById(`sec-${name}`);
+    if (!sec) return;
+    sec.classList.remove('collapsed');
+    sec.style.height = sec.style.transition = sec.style.flex = '';
+  });
+  document.getElementById('left-sb').classList.remove('closed');
+  document.getElementById('right-sb').classList.remove('closed');
+  document.getElementById('la').innerHTML = '&#x2039;';
+  document.getElementById('ra').innerHTML = '&#x203A;';
+  dismissV1Alert();
+}
+
+function initV1() {
+  renderTS();
+  updateHandles();
+  setTimeout(startTS, 300);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  VERSION 2
+// ═══════════════════════════════════════════════════════════════
+const TS2 = { status: 'idle', lines: [], idx: 0, timer: null, hasStarted: false };
+const V2_PANELS = { left: true, bottom: false, right: false };
+let V2_TAB = 'ts';
+
+function v2TogglePanel(panel) {
+  V2_PANELS[panel] = !V2_PANELS[panel];
+  v2ApplyPanels();
+}
+
+function v2ApplyPanels() {
+  document.getElementById('v2-left').classList.toggle('closed', !V2_PANELS.left);
+  document.getElementById('v2-bottom').classList.toggle('closed', !V2_PANELS.bottom);
+  document.getElementById('v2-right').classList.toggle('closed', !V2_PANELS.right);
+  document.getElementById('vpb-left').classList.toggle('v2-active', V2_PANELS.left);
+  document.getElementById('vpb-bottom').classList.toggle('v2-active', V2_PANELS.bottom);
+  document.getElementById('vpb-right').classList.toggle('v2-active', V2_PANELS.right);
+  const bottom = document.getElementById('v2-bottom');
+  bottom.style.left = V2_PANELS.left ? '360px' : '0';
+  bottom.style.right = V2_PANELS.right ? '360px' : '0';
+}
+
+function v2SwitchTab(tab) {
+  if (V2_TAB === tab) return;
+  document.getElementById(`v2-pane-${V2_TAB}`).classList.add('v2-pane-hidden');
+  document.getElementById(`v2-tab-${V2_TAB}`).classList.remove('active');
+  V2_TAB = tab;
+  document.getElementById(`v2-pane-${tab}`).classList.remove('v2-pane-hidden');
+  document.getElementById(`v2-tab-${tab}`).classList.add('active');
+}
+
+function renderTS2() {
+  const ctrl   = document.getElementById('v2-ts-controls');
+  const scroll = document.getElementById('v2-ts-scroll');
+  const restart= document.getElementById('v2-ts-restart');
+  if (!ctrl || !scroll) return;
+
+  const st = TS2.status;
+  const stopIcon = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect width="12" height="12" rx="2" fill="#D6294E"/></svg>`;
+
+  if (st === 'listening') {
+    ctrl.innerHTML = `<div class="v2-ts-ctrl">
+      <div class="status-dot listening"></div>
+      <span class="status-label">Listening...</span>
+      ${waveHTML('active')}
+      <button class="v2-ctrl-btn" onclick="v2PauseTS()" title="Pause">${IC_PAUSE}</button>
+      <button class="v2-ctrl-btn v2-stop-btn" onclick="v2StopTS()" title="Stop">${stopIcon}</button>
+    </div>`;
+  } else if (st === 'paused') {
+    ctrl.innerHTML = `<div class="v2-ts-ctrl">
+      <div class="status-dot paused"></div>
+      <span class="status-label">Paused</span>
+      ${waveHTML('paused-bar')}
+      <button class="v2-ctrl-btn" onclick="v2ResumeTS()" title="Resume">${IC_PLAY}</button>
+      <button class="v2-ctrl-btn v2-stop-btn" onclick="v2StopTS()" title="Stop">${stopIcon}</button>
+    </div>`;
+  } else {
+    ctrl.innerHTML = '';
+  }
+
+  restart.style.display = (st === 'idle' && TS2.hasStarted) ? 'block' : 'none';
+  scroll.classList.toggle('stopped', st === 'idle' && TS2.lines.length > 0);
+
+  scroll.innerHTML = '';
+  TS2.lines.forEach(({ s, t }) => {
+    const el = document.createElement('div');
+    el.className = 'ts-entry';
+    el.innerHTML = `<div class="speaker-pill ${s}">${s === 'caller' ? 'Caller' : 'Specialist'}</div>
+                    <div class="ts-text">${t}</div>`;
+    scroll.appendChild(el);
+  });
+  scroll.scrollTop = scroll.scrollHeight;
+}
+
+function v2StartTS() {
+  TS2.status = 'listening'; TS2.lines = []; TS2.idx = 0; TS2.hasStarted = true;
+  renderTS2();
+  v2ScheduleTS();
+}
+function v2PauseTS()  { TS2.status = 'paused'; clearTimeout(TS2.timer); renderTS2(); }
+function v2ResumeTS() { TS2.status = 'listening'; renderTS2(); v2ScheduleTS(); }
+function v2StopTS()   { TS2.status = 'idle'; clearTimeout(TS2.timer); renderTS2(); }
+
+function v2ScheduleTS() {
+  if (TS2.idx >= LINES.length) return;
+  TS2.timer = setTimeout(() => {
+    if (TS2.status !== 'listening') return;
+    TS2.lines.push(LINES[TS2.idx++]);
+    renderTS2();
+    v2ScheduleTS();
+  }, 1900 + Math.random() * 1200);
+}
+
+function resetTS2Full() {
+  TS2.status = 'idle'; TS2.lines = []; TS2.idx = 0; TS2.hasStarted = false;
+  clearTimeout(TS2.timer);
+}
+
+function initV2() {
+  V2_PANELS.left = true; V2_PANELS.bottom = false; V2_PANELS.right = false;
+  V2_TAB = 'ts';
+  ['ts', 'summary', 'policy'].forEach(t => {
+    const pane = document.getElementById(`v2-pane-${t}`);
+    const tab  = document.getElementById(`v2-tab-${t}`);
+    if (pane) pane.classList.toggle('v2-pane-hidden', t !== 'ts');
+    if (tab)  tab.classList.toggle('active', t === 'ts');
+  });
+  document.getElementById('v2-panel-btns').classList.add('show');
+  v2ApplyPanels();
+  renderTS2();
+  setTimeout(v2StartTS, 300);
+}
+
+function resetV2() {
+  resetTS2Full();
+  document.getElementById('v2-panel-btns').classList.remove('show');
+  dismissV2Alert();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  VERSION 3
+// ═══════════════════════════════════════════════════════════════
+const TS3 = { status: 'idle', lines: [], idx: 0, timer: null, hasStarted: false };
+let V3_SUPPORT_OPEN = false;
+
+const IC_CHEV_R = `<svg width="10" height="18" viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l6 7-6 7"/></svg>`;
+const IC_CHEV_L = `<svg width="10" height="18" viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2L2 9l6 7"/></svg>`;
+
+function v3IsOpen() {
+  const el = document.getElementById('v3-layout');
+  return el && el.classList.contains('v3-ts-open');
+}
+
+function renderV3CtrlBar() {
+  const bar = document.getElementById('v3-ctrl-bar');
+  if (!bar) return;
+  const open = v3IsOpen();
+  const st = TS3.status;
+  const chevBtn = `<button class="v3-chev-btn" onclick="v3ToggleTS()" title="${open ? 'Collapse transcript' : 'Expand transcript'}">${open ? IC_CHEV_L : IC_CHEV_R}</button>`;
+
+  let main = '';
+  if (st === 'listening') {
+    main = `
+      <div class="status-dot listening"></div>
+      <span class="status-label">Listening...</span>
+      ${waveHTML('active')}
+      <button class="ts-icon-btn" onclick="v3PauseTS()" title="Pause">${IC_PAUSE}</button>
+      <button class="ts-icon-btn stop-icon" onclick="v3StopTS()" title="Stop">${IC_STOP}</button>`;
+  } else if (st === 'paused') {
+    main = `
+      <div class="status-dot paused"></div>
+      <span class="status-label">Paused</span>
+      ${waveHTML('paused-bar')}
+      <button class="ts-icon-btn" onclick="v3ResumeTS()" title="Resume">${IC_PLAY}</button>
+      <button class="ts-icon-btn stop-icon" onclick="v3StopTS()" title="Stop">${IC_STOP}</button>`;
+  } else {
+    main = `
+      <div class="sec-icon">${IC_MIC}</div>
+      <span class="sec-title" style="flex:1">Live Transcript</span>
+      <button class="ts-icon-btn" onclick="v3StartTS()" title="Start">${IC_PLAY}</button>`;
+  }
+  bar.innerHTML = `<div class="v3-ctrl-main">${main}</div>${chevBtn}`;
+}
+
+function renderV3Entries() {
+  const entries = document.getElementById('v3-ts-entries');
+  const restart = document.getElementById('v3-ts-restart');
+  if (!entries) return;
+  const st = TS3.status;
+  restart.style.display = (st === 'idle' && TS3.hasStarted) ? 'block' : 'none';
+  entries.classList.toggle('stopped', st === 'idle' && TS3.lines.length > 0);
+  entries.innerHTML = '';
+  TS3.lines.forEach(({ s, t }) => {
+    const el = document.createElement('div');
+    el.className = 'ts-entry';
+    el.innerHTML = `<div class="speaker-pill ${s}">${s === 'caller' ? 'Caller' : 'Specialist'}</div>
+                    <div class="ts-text">${t}</div>`;
+    entries.appendChild(el);
+  });
+  entries.scrollTop = entries.scrollHeight;
+}
+
+function v3StartTS() {
+  TS3.status = 'listening'; TS3.lines = []; TS3.idx = 0; TS3.hasStarted = true;
+  renderV3CtrlBar(); renderV3Entries(); v3ScheduleTS();
+}
+function v3PauseTS()  { TS3.status = 'paused';    clearTimeout(TS3.timer); renderV3CtrlBar(); }
+function v3ResumeTS() { TS3.status = 'listening';  renderV3CtrlBar(); v3ScheduleTS(); }
+function v3StopTS()   { TS3.status = 'idle';       clearTimeout(TS3.timer); renderV3CtrlBar(); renderV3Entries(); }
+
+function v3ScheduleTS() {
+  if (TS3.idx >= LINES.length) return;
+  TS3.timer = setTimeout(() => {
+    if (TS3.status !== 'listening') return;
+    TS3.lines.push(LINES[TS3.idx++]);
+    renderV3Entries();
+    v3ScheduleTS();
+  }, 1900 + Math.random() * 1200);
+}
+
+function v3ToggleTS() {
+  document.getElementById('v3-layout').classList.toggle('v3-ts-open');
+  renderV3CtrlBar();
+}
+
+function v3ToggleSupport() {
+  V3_SUPPORT_OPEN = !V3_SUPPORT_OPEN;
+  document.getElementById('v3-support-panel').classList.toggle('open', V3_SUPPORT_OPEN);
+}
+
+// Generic sec collapse/expand for v3 (works with any element-scoped sections-wrap)
+function v3ToggleSec(name) {
+  const sec = document.getElementById(`v3-sec-${name}`);
+  if (!sec) return;
+  const id = sec.id;
+  if (sec.classList.contains('collapsed')) {
+    const wrap = sec.closest('.sections-wrap');
+    const savedH = SEC_HEIGHTS[id];
+    let targetH = (savedH && savedH > HEADER_H) ? savedH : calcFairShare(wrap, id);
+    const sib = v3FindExpandedSib(sec);
+    if (sib) {
+      const sibH = sib.offsetHeight;
+      const newSibH = Math.max(HEADER_H + 40, sibH - (targetH - HEADER_H));
+      targetH = HEADER_H + (sibH - newSibH);
+      sib.style.transition = 'height 0.28s cubic-bezier(0.4,0,0.2,1)';
+      sib.style.height = newSibH + 'px';
+    }
+    sec.style.transition = 'height 0.28s cubic-bezier(0.4,0,0.2,1)';
+    sec.style.height = targetH + 'px';
+    sec.classList.remove('collapsed');
+    delete SEC_HEIGHTS[id];
+  } else {
+    SEC_HEIGHTS[id] = sec.offsetHeight;
+    sec.style.transition = 'height 0.28s cubic-bezier(0.4,0,0.2,1)';
+    sec.style.height = HEADER_H + 'px';
+    sec.classList.add('collapsed');
+    const sib = v3FindExpandedSib(sec);
+    if (sib) {
+      const freed = (SEC_HEIGHTS[id] || 0) - HEADER_H;
+      sib.style.transition = 'height 0.28s cubic-bezier(0.4,0,0.2,1)';
+      sib.style.height = (sib.offsetHeight + freed) + 'px';
+    }
+  }
+  updateHandles();
+}
+
+function v3FindExpandedSib(el) {
+  const wrap = el.closest('.sections-wrap');
+  if (!wrap) return null;
+  const secs = [...wrap.querySelectorAll('.sec')];
+  const idx = secs.indexOf(el);
+  for (let i = idx + 1; i < secs.length; i++) {
+    if (!secs[i].classList.contains('collapsed')) return secs[i];
+  }
+  for (let i = idx - 1; i >= 0; i--) {
+    if (!secs[i].classList.contains('collapsed')) return secs[i];
+  }
+  return null;
+}
+
+function initV3() {
+  ['notes', 'summary', 'policy'].forEach(name => {
+    const sec = document.getElementById(`v3-sec-${name}`);
+    if (!sec) return;
+    sec.classList.remove('collapsed');
+    sec.style.height = sec.style.transition = sec.style.flex = '';
+  });
+  document.getElementById('v3-layout').classList.remove('v3-ts-open');
+  V3_SUPPORT_OPEN = false;
+  document.getElementById('v3-support-panel').classList.remove('open');
+  updateHandles();
+  renderV3CtrlBar();
+  renderV3Entries();
+  setTimeout(v3StartTS, 300);
+}
+
+function resetV3() {
+  TS3.status = 'idle'; TS3.lines = []; TS3.idx = 0; TS3.hasStarted = false;
+  clearTimeout(TS3.timer);
+  dismissV3Alert();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  VERSION 4
+// ═══════════════════════════════════════════════════════════════
+const TS4 = { status: 'idle', lines: [], idx: 0, timer: null, hasStarted: false };
+
+const V4_CONFIG = {
+  ts:      { side: 'left',  order: 0, open: false, normal: 'icons/Voice to 1.svg',    light: 'icons/Voice to 2 Light.svg' },
+  summary: { side: 'left',  order: 1, open: false, normal: 'icons/Abstract to 2.svg', light: 'icons/Abstract to 3 Light.svg' },
+  policy:  { side: 'left',  order: 2, open: false, normal: 'icons/folder.svg',        light: 'icons/folder Light.svg' },
+  notes:   { side: 'right', order: 0, open: false, normal: 'icons/pen.svg',           light: 'icons/pen Light.svg' },
+  support: { side: 'right', order: 1, open: false, normal: 'icons/review.svg',        light: 'icons/review Light.svg' },
+};
+
+function v4Toggle(name) {
+  const cfg = V4_CONFIG[name];
+  cfg.open = !cfg.open;
+
+  const slot = document.getElementById(`v4s-${name}`);
+  slot.classList.toggle('open', cfg.open);
+
+  const btn = document.getElementById(`v4tb-${name}`);
+  const img = document.getElementById(`v4tbimg-${name}`);
+  btn.classList.toggle('v4-active', cfg.open);
+  img.src = cfg.open ? cfg.light : cfg.normal;
+
+  v4UpdateLast(cfg.side);
+
+  if (name === 'ts' && cfg.open && TS4.status === 'idle' && !TS4.hasStarted) {
+    setTimeout(v4StartTS, 380);
+  }
+}
+
+function v4UpdateLast(side) {
+  const pairs = Object.entries(V4_CONFIG)
+    .filter(([, c]) => c.side === side)
+    .sort(([, a], [, b]) => a.order - b.order);
+  let lastOpen = null;
+  pairs.forEach(([n, c]) => {
+    document.getElementById(`v4s-${n}`).classList.remove('last');
+    if (c.open) lastOpen = n;
+  });
+  if (lastOpen) document.getElementById(`v4s-${lastOpen}`).classList.add('last');
+}
+
+function renderV4TSBar() {
+  const bar = document.getElementById('v4-ts-bar');
+  if (!bar) return;
+  const st = TS4.status;
+  bar.classList.toggle('v4-err', st === 'error');
+  let html = '';
+  if (st === 'listening') {
+    html = `<div class="status-dot listening"></div>
+            <span class="status-label">Listening...</span>
+            ${waveHTML('active')}
+            <button class="ts-icon-btn" onclick="v4PauseTS()" title="Pause">${IC_PAUSE}</button>
+            <button class="ts-icon-btn stop-icon" onclick="v4StopTS()" title="Stop">${IC_STOP}</button>`;
+  } else if (st === 'paused') {
+    html = `<div class="status-dot paused"></div>
+            <span class="status-label">Paused</span>
+            ${waveHTML('paused-bar')}
+            <button class="ts-icon-btn" onclick="v4ResumeTS()" title="Resume">${IC_PLAY}</button>
+            <button class="ts-icon-btn stop-icon" onclick="v4StopTS()" title="Stop">${IC_STOP}</button>`;
+  } else if (st === 'error') {
+    html = `<svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="#D6294E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M7 1.5L13 12H1L7 1.5Z"/><path d="M7 5.5v2.5M7 9.5v.5"/></svg>
+            <span style="flex:1;font-size:12px;color:#D6294E;font-weight:600;line-height:1.3">Low voice quality — auto-stopped</span>
+            <button class="alert-gotit" style="height:26px;padding:0 11px;font-size:12px;border-radius:6px" onclick="dismissV4Alert()">Got it</button>`;
+  } else {
+    html = `<div class="sec-icon">${IC_MIC}</div>
+            <span style="flex:1;font-size:13px;color:var(--text-soft)">Not recording</span>
+            <button class="ts-icon-btn" onclick="v4StartTS()" title="Start">${IC_PLAY}</button>`;
+  }
+  bar.innerHTML = html;
+}
+
+function renderV4TSEntries() {
+  const body = document.getElementById('v4-ts-body');
+  if (!body) return;
+  const st = TS4.status;
+  body.classList.toggle('stopped', st === 'idle' && TS4.lines.length > 0);
+  body.innerHTML = '';
+  if (st === 'idle' && TS4.hasStarted && TS4.lines.length === 0) {
+    const btn = document.createElement('button');
+    btn.className = 'restart-pill';
+    btn.onclick = v4StartTS;
+    btn.innerHTML = 'Start Transcription <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor" style="opacity:0.6"><path d="M1 1l8 5-8 5V1z"/></svg>';
+    body.appendChild(btn);
+    return;
+  }
+  TS4.lines.forEach(({ s, t }) => {
+    const el = document.createElement('div');
+    el.className = 'ts-entry';
+    el.innerHTML = `<div class="speaker-pill ${s}">${s === 'caller' ? 'Caller' : 'Specialist'}</div>
+                    <div class="ts-text">${t}</div>`;
+    body.appendChild(el);
+  });
+  body.scrollTop = body.scrollHeight;
+}
+
+function v4StartTS() {
+  TS4.status = 'listening'; TS4.lines = []; TS4.idx = 0; TS4.hasStarted = true;
+  renderV4TSBar(); renderV4TSEntries(); v4ScheduleTS();
+}
+function v4PauseTS()  { TS4.status = 'paused';    clearTimeout(TS4.timer); renderV4TSBar(); }
+function v4ResumeTS() { TS4.status = 'listening';  renderV4TSBar(); v4ScheduleTS(); }
+function v4StopTS()   { TS4.status = 'idle';       clearTimeout(TS4.timer); renderV4TSBar(); renderV4TSEntries(); }
+
+function v4ScheduleTS() {
+  if (TS4.idx >= LINES.length) return;
+  TS4.timer = setTimeout(() => {
+    if (TS4.status !== 'listening') return;
+    TS4.lines.push(LINES[TS4.idx++]);
+    renderV4TSEntries();
+    v4ScheduleTS();
+  }, 1900 + Math.random() * 1200);
+}
+
+function initV4() {
+  Object.keys(V4_CONFIG).forEach(name => {
+    V4_CONFIG[name].open = false;
+    const slot = document.getElementById(`v4s-${name}`);
+    if (slot) slot.classList.remove('open', 'last');
+    const btn = document.getElementById(`v4tb-${name}`);
+    const img = document.getElementById(`v4tbimg-${name}`);
+    if (btn) btn.classList.remove('v4-active');
+    if (img) img.src = V4_CONFIG[name].normal;
+  });
+  renderV4TSBar();
+}
+
+function resetV4() {
+  TS4.status = 'idle'; TS4.lines = []; TS4.idx = 0; TS4.hasStarted = false;
+  clearTimeout(TS4.timer);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  VOICE QUALITY ALERT SYSTEM
+// ═══════════════════════════════════════════════════════════════
+function triggerVoiceAlert() {
+  if (currentV === 1) triggerV1Alert();
+  else if (currentV === 2) triggerV2Alert();
+  else if (currentV === 3) triggerV3Alert();
+  else if (currentV === 4) triggerV4Alert();
+}
+
+// V1 — top-center banner
+function triggerV1Alert() {
+  stopTS(); renderTS();
+  document.getElementById('v1-banner').classList.add('show');
+}
+function dismissV1Alert() {
+  const el = document.getElementById('v1-banner');
+  if (el) el.classList.remove('show');
+}
+
+// V2 — bottom-right toast
+function triggerV2Alert() {
+  v2StopTS();
+  document.getElementById('v2-toast').classList.add('show');
+}
+function dismissV2Alert() {
+  const el = document.getElementById('v2-toast');
+  if (el) el.classList.remove('show');
+}
+
+// V3 — center modal
+function triggerV3Alert() {
+  v3StopTS();
+  document.getElementById('v3-alert-overlay').classList.add('show');
+}
+function dismissV3Alert() {
+  const el = document.getElementById('v3-alert-overlay');
+  if (el) el.classList.remove('show');
+}
+
+// V4 — in-place error state in the transcript panel
+function triggerV4Alert() {
+  clearTimeout(TS4.timer);
+  TS4.status = 'error';
+  TS4.hasStarted = true;
+  if (!V4_CONFIG.ts.open) v4Toggle('ts');
+  setTimeout(renderV4TSBar, 60);
+}
+function dismissV4Alert() {
+  TS4.status = 'idle';
+  renderV4TSBar();
+  renderV4TSEntries();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LANDING PAGE
+// ═══════════════════════════════════════════════════════════════
+function enterPrototype() {
+  document.getElementById('landing').classList.add('hide');
+  setTimeout(() => { document.getElementById('landing').style.display = 'none'; }, 420);
+}
+function openPreview() {
+  document.getElementById('preview-lightbox').classList.add('show');
+}
+function closePreview() {
+  document.getElementById('preview-lightbox').classList.remove('show');
+}
+function handleLbClick(e) {
+  if (e.target === document.getElementById('preview-lightbox')) closePreview();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════════════
+initResize();
+initV1();
+</script>
+
+<!-- V1: top-center banner — fixed to viewport so it isn't clipped by view overflow:hidden -->
+<div class="v1-banner" id="v1-banner">
+  <div class="v1-banner-card">
+    <div class="v1-banner-icon">!</div>
+    <div class="v1-banner-texts">
+      <div class="v1-banner-title">Low Voice Quality Detected</div>
+      <div class="v1-banner-desc">Voice transcription stopped. Please validate or manually note caller name and intent under Call Summary.</div>
+    </div>
+    <button class="alert-gotit" onclick="dismissV1Alert()">Got it</button>
+    <button class="alert-x" onclick="dismissV1Alert()" title="Dismiss">×</button>
+  </div>
+</div>
+</body>
+</html>
