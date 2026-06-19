@@ -2405,7 +2405,8 @@ function resetV1() {
     const sec = document.getElementById(`sec-${name}`);
     if (!sec) return;
     sec.classList.remove('collapsed');
-    sec.style.height = sec.style.transition = sec.style.flex = '';
+    sec.style.transition = sec.style.flex = '';
+    sec.style.height = 'calc(33.33% - 13px)';
   });
   document.getElementById('left-sb').classList.remove('closed');
   document.getElementById('right-sb').classList.remove('closed');
