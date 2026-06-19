@@ -995,6 +995,24 @@ body {
 .v4-center::-webkit-scrollbar { width: 6px; }
 .v4-center::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
 
+/* V4 floating transcript status pill */
+.v4-ts-pill {
+  position: absolute; top: 12px; left: 8px;
+  height: 44px; min-width: 120px;
+  background: white; border-radius: 22px;
+  padding: 0 8px 0 14px;
+  display: flex; align-items: center; gap: 7px;
+  box-shadow: 0 2px 6px rgba(0,44,92,0.06), 0 8px 24px rgba(0,44,92,0.08);
+  z-index: 3; pointer-events: all;
+  opacity: 1;
+  transition: opacity 0.22s var(--ease), transform 0.22s var(--ease);
+}
+.v4-ts-pill.v4-pill-hidden {
+  opacity: 0; pointer-events: none;
+  transform: scale(0.93) translateY(-4px);
+}
+.v4-ts-pill.v4-err { background: #fceff2; }
+
 .v4-toolbar {
   position: absolute; bottom: 16px; right: 12px;
   display: flex; align-items: center; gap: 2px;
@@ -2048,6 +2066,9 @@ body {
     </div>
 
     <!-- Bottom-right toolbar -->
+    <!-- Floating transcript status pill (visible when TS panel is closed) -->
+    <div class="v4-ts-pill" id="v4-ts-pill"></div>
+
     <div class="v4-toolbar">
       <button class="v4-tb-btn" id="v4tb-ts" onclick="v4Toggle('ts')" title="Live Transcript">
         <img id="v4tbimg-ts" src="icons/Voice to 1.svg" alt="">
@@ -2688,7 +2709,8 @@ function initV3() {
     const sec = document.getElementById(`v3-sec-${name}`);
     if (!sec) return;
     sec.classList.remove('collapsed');
-    sec.style.height = sec.style.transition = sec.style.flex = '';
+    sec.style.transition = sec.style.flex = '';
+    sec.style.height = 'calc(33.33% - 13px)';
   });
   document.getElementById('v3-layout').classList.remove('v3-ts-open');
   V3_SUPPORT_OPEN = false;
@@ -2731,6 +2753,7 @@ function v4Toggle(name) {
   img.src = cfg.open ? cfg.light : cfg.normal;
 
   v4UpdateLast(cfg.side);
+  if (name === 'ts') renderV4TSPill();
 
   if (name === 'ts' && cfg.open && TS4.status === 'idle' && !TS4.hasStarted) {
     setTimeout(v4StartTS, 380);
@@ -2749,34 +2772,54 @@ function v4UpdateLast(side) {
   if (lastOpen) document.getElementById(`v4s-${lastOpen}`).classList.add('last');
 }
 
-function renderV4TSBar() {
-  const bar = document.getElementById('v4-ts-bar');
-  if (!bar) return;
-  const st = TS4.status;
-  bar.classList.toggle('v4-err', st === 'error');
-  let html = '';
+function v4TSBarHTML(st) {
   if (st === 'listening') {
-    html = `<div class="status-dot listening"></div>
+    return `<div class="status-dot listening"></div>
             <span class="status-label">Listening...</span>
             ${waveHTML('active')}
             <button class="ts-icon-btn" onclick="v4PauseTS()" title="Pause">${IC_PAUSE}</button>
             <button class="ts-icon-btn stop-icon" onclick="v4StopTS()" title="Stop">${IC_STOP}</button>`;
   } else if (st === 'paused') {
-    html = `<div class="status-dot paused"></div>
+    return `<div class="status-dot paused"></div>
             <span class="status-label">Paused</span>
             ${waveHTML('paused-bar')}
             <button class="ts-icon-btn" onclick="v4ResumeTS()" title="Resume">${IC_PLAY}</button>
             <button class="ts-icon-btn stop-icon" onclick="v4StopTS()" title="Stop">${IC_STOP}</button>`;
   } else if (st === 'error') {
-    html = `<svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="#D6294E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M7 1.5L13 12H1L7 1.5Z"/><path d="M7 5.5v2.5M7 9.5v.5"/></svg>
+    return `<svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="#D6294E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M7 1.5L13 12H1L7 1.5Z"/><path d="M7 5.5v2.5M7 9.5v.5"/></svg>
             <span style="flex:1;font-size:12px;color:#D6294E;font-weight:600;line-height:1.3">Low voice quality — auto-stopped</span>
             <button class="alert-gotit" style="height:26px;padding:0 11px;font-size:12px;border-radius:6px" onclick="dismissV4Alert()">Got it</button>`;
   } else {
-    html = `<div class="sec-icon">${IC_MIC}</div>
+    return `<div class="sec-icon">${IC_MIC}</div>
             <span style="flex:1;font-size:13px;color:var(--text-soft)">Not recording</span>
-            <button class="ts-icon-btn" onclick="v4StartTS()" title="Start">${IC_PLAY}</button>`;
+            <button class="ts-icon-btn" onclick="v4PillPlay()" title="Start">${IC_PLAY}</button>`;
   }
-  bar.innerHTML = html;
+}
+
+function renderV4TSBar() {
+  const bar = document.getElementById('v4-ts-bar');
+  if (bar) {
+    const st = TS4.status;
+    bar.classList.toggle('v4-err', st === 'error');
+    bar.innerHTML = v4TSBarHTML(st);
+  }
+  renderV4TSPill();
+}
+
+function renderV4TSPill() {
+  const pill = document.getElementById('v4-ts-pill');
+  if (!pill) return;
+  const panelOpen = V4_CONFIG.ts.open;
+  pill.classList.toggle('v4-pill-hidden', panelOpen);
+  if (panelOpen) return;
+  const st = TS4.status;
+  pill.classList.toggle('v4-err', st === 'error');
+  pill.innerHTML = v4TSBarHTML(st);
+}
+
+function v4PillPlay() {
+  if (!V4_CONFIG.ts.open) v4Toggle('ts');
+  setTimeout(v4StartTS, 380);
 }
 
 function renderV4TSEntries() {
@@ -2832,6 +2875,8 @@ function initV4() {
     if (img) img.src = V4_CONFIG[name].normal;
   });
   renderV4TSBar();
+  renderV4TSPill();
+  setTimeout(v4StartTS, 300);
 }
 
 function resetV4() {
